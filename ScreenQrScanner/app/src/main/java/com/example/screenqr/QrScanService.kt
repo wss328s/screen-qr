@@ -148,8 +148,8 @@ class QrScanService : Service() {
             return
         }
 
-        // 重置扫码历史，显示悬浮窗
-        ScanHistory.reset()
+        // 重置比赛状态，显示悬浮窗
+        GameState.reset()
         FloatingResultManager.update(this)
 
         isRunning = true
@@ -192,7 +192,7 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (!text.isNullOrBlank()) {
-                if (ScanHistory.add(text)) {
+                if (GameState.parseAndRecord(text)) {
                     qrCount++
                     found = true
                     FloatingResultManager.update(this)

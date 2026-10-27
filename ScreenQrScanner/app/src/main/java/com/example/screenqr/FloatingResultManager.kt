@@ -16,7 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * 常驻悬浮窗：显示扫码内容列表。
+ * 常驻悬浮窗：显示比赛导航状态。
  */
 object FloatingResultManager {
 
@@ -24,18 +24,18 @@ object FloatingResultManager {
 
     fun update(ctx: Context) {
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val text = ScanHistory.statusText()
+        val text = GameState.statusText()
 
         if (currentView == null) {
             val view = LayoutInflater.from(ctx).inflate(R.layout.floating_result, null)
             view.findViewById<TextView>(R.id.qrContent).text = text
             view.findViewById<Button>(R.id.copyBtn).setOnClickListener {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("scan", ScanHistory.fullSummary()))
-                Toast.makeText(ctx, "已复制全部内容", Toast.LENGTH_SHORT).show()
+                cm.setPrimaryClip(ClipData.newPlainText("game", GameState.fullSummary()))
+                Toast.makeText(ctx, "已复制全部结果", Toast.LENGTH_SHORT).show()
             }
             view.findViewById<Button>(R.id.closeBtn).setOnClickListener {
-                ScanHistory.reset()
+                GameState.reset()
                 update(ctx)
             }
 
