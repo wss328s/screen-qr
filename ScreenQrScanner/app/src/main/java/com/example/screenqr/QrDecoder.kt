@@ -6,17 +6,18 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
-import com.google.zxing.common.GlobalHistogramBinarizer
+import com.google.zxing.common.HybridBinarizer
 
 /**
- * 快速识别器：关掉努力模式，用更快的二值化算法。
+ * 动态识别：高识别率优先，飞着扫一下就中。
  */
 object QrDecoder {
 
     private val reader = MultiFormatReader().apply {
         setHints(
             mapOf(
-                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)
+                DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+                DecodeHintType.TRY_HARDER to true
             )
         )
     }
@@ -27,11 +28,11 @@ object QrDecoder {
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        // 快速路径：GlobalHistogramBinarizer比HybridBinarizer快很多
+        // 正常识别（高识别率）
         var result = tryDecode(w, h, pixels, false)
         if (result != null) return result
 
-        // 反色
+        // 反色（逆光/白码黑底）
         result = tryDecode(w, h, pixels, true)
         return result
     }
@@ -42,7 +43,7 @@ object QrDecoder {
         return try {
             val src = RGBLuminanceSource(w, h, pixels)
             val source = if (invert) src.invert() else src
-            val binary = BinaryBitmap(GlobalHistogramBinarizer(source))
+            val binary = BinaryBitmap(HybridBinarizer(source))
             reader.decode(binary).text
         } catch (e: Exception) {
             null

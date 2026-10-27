@@ -37,7 +37,7 @@ class QrScanService : Service() {
 
         private const val SCAN_INTERVAL_MS = 150L
         private const val DEDUP_TTL_MS = 2000L
-        private const val SCALE_WIDTH = 400
+        private const val SCALE_WIDTH = 500
 
         @Volatile
         var isRunning = false
