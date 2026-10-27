@@ -192,6 +192,9 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (result != null) {
+                // 更新红框位置
+                FloatingResultManager.updateRect(result.points, SCALE_WIDTH, screenW, screenH)
+
                 if (GameState.parseAndRecord(result.text)) {
                     qrCount++
                     found = true
