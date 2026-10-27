@@ -96,10 +96,11 @@ object FloatingResultManager {
      * 更新画框位置。
      * @param points ZXing返回的二维码角点坐标（在缩放后的bitmap坐标系里）
      * @param bitmapW 缩放后的bitmap宽度
+     * @param bitmapH 缩放后的bitmap高度
      * @param screenW 屏幕实际宽度
      * @param screenH 屏幕实际高度
      */
-    fun updateRect(points: FloatArray?, bitmapW: Int, screenW: Int, screenH: Int) {
+    fun updateRect(points: FloatArray?, bitmapW: Int, bitmapH: Int, screenW: Int, screenH: Int) {
         val overlay = overlayView ?: return
         if (points == null || points.size < 4) {
             overlay.clearRect()
@@ -108,7 +109,7 @@ object FloatingResultManager {
 
         // 从bitmap坐标换算到屏幕坐标
         val scaleX = screenW.toFloat() / bitmapW
-        val scaleY = screenH.toFloat() / bitmapW  // 因为bitmap是按宽度缩放的，高度按比例
+        val scaleY = screenH.toFloat() / bitmapH
 
         var minX = Float.MAX_VALUE
         var minY = Float.MAX_VALUE

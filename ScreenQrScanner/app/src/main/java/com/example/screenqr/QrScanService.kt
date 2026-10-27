@@ -37,7 +37,7 @@ class QrScanService : Service() {
 
         private const val SCAN_INTERVAL_MS = 100L
         private const val DEDUP_TTL_MS = 5000L
-        private const val SCALE_WIDTH = 600
+        private const val SCALE_WIDTH = 800
 
         @Volatile
         var isRunning = false
@@ -188,12 +188,14 @@ class QrScanService : Service() {
                 }
             } else cropped
 
+            val scaledW = scaled.width
+            val scaledH = scaled.height
             val result = QrDecoder.decode(scaled)
             scaled.recycle()
 
             if (result != null) {
                 // 更新红框位置
-                FloatingResultManager.updateRect(result.points, SCALE_WIDTH, screenW, screenH)
+                FloatingResultManager.updateRect(result.points, scaledW, scaledH, screenW, screenH)
 
                 if (GameState.parseAndRecord(result.text)) {
                     qrCount++
