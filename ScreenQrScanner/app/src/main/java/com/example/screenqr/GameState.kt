@@ -77,21 +77,16 @@ object GameState {
         val sb = StringBuilder()
         sb.append("岔路$legNum/4 · 已读$totalRead/12\n")
 
+        // 当前岔路的3个码
         val parts = leg.codes.mapIndexed { i, v -> "码${i+1}:$v" }
         val display = parts.ifEmpty { listOf("码1:?","码2:?","码3:?") }
         sb.append(display.joinToString("  "))
 
-        // 所有扫出来的码
-        if (allCodes.isNotEmpty()) {
-            sb.append("\n全部: ")
-            sb.append(allCodes.joinToString(" "))
-        }
-
-        // 所有已完成的推荐结果
+        // 所有岔路完整结果（3个码+推荐）
         for (i in 0..3) {
             val l = legs[i]
             if (l.isComplete) {
-                sb.append("\n岔路${i+1}→走第${l.recommendedIndex()!!+1}个(${l.recommendedValue()})")
+                sb.append("\n岔路${i+1}: ${l.codes.joinToString(" ")} → 走第${l.recommendedIndex()!!+1}个(${l.recommendedValue()})")
             }
         }
         return sb.toString()
