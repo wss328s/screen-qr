@@ -13,8 +13,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
-      - name: Accept SDK licenses
+      - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
       - uses: gradle/gradle-build-action@v3
         with:
