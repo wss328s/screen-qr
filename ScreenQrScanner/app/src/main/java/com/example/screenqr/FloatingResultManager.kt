@@ -63,75 +63,9 @@ object FloatingResultManager {
                 currentView = view
             } catch (e: Exception) {
             }
-
-            // 加全屏画框View
-            if (overlayView == null) {
-                val overlay = QrOverlayView(ctx)
-                val overlayParams = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                    PixelFormat.TRANSLUCENT
-                ).apply {
-                    gravity = Gravity.TOP or Gravity.START
-                    x = 0
-                    y = 0
-                }
-                try {
-                    wm.addView(overlay, overlayParams)
-                    overlayView = overlay
-                } catch (e: Exception) {
-                }
-            }
         } else {
             currentView?.findViewById<TextView>(R.id.qrContent)?.text = text
         }
-    }
-
-    /**
-     * 更新画框位置。
-     * @param points ZXing返回的二维码角点坐标（在缩放后的bitmap坐标系里）
-     * @param bitmapW 缩放后的bitmap宽度
-     * @param bitmapH 缩放后的bitmap高度
-     * @param screenW 屏幕实际宽度
-     * @param screenH 屏幕实际高度
-     */
-    fun updateRect(points: FloatArray?, bitmapW: Int, bitmapH: Int, screenW: Int, screenH: Int) {
-        val overlay = overlayView ?: return
-        if (points == null || points.size < 4) {
-            overlay.clearRect()
-            return
-        }
-
-        // 从bitmap坐标换算到屏幕坐标
-        val scaleX = screenW.toFloat() / bitmapW
-        val scaleY = screenH.toFloat() / bitmapH
-
-        var minX = Float.MAX_VALUE
-        var minY = Float.MAX_VALUE
-        var maxX = Float.MIN_VALUE
-        var maxY = Float.MIN_VALUE
-
-        // points是[x1,y1,x2,y2,x3,y3...]
-        for (i in 0 until points.size step 2) {
-            val x = points[i] * scaleX
-            val y = points[i + 1] * scaleY
-            if (x < minX) minX = x
-            if (y < minY) minY = y
-            if (x > maxX) maxX = x
-            if (y > maxY) maxY = y
-        }
-
-        // 往外扩一点
-        val padding = 20f
-        overlay.setRect(minX - padding, minY - padding, maxX + padding, maxY + padding)
-    }
-
-    fun clearRect() {
-        overlayView?.clearRect()
     }
 
     fun notifyRead(ctx: Context) {
@@ -150,11 +84,5 @@ object FloatingResultManager {
             try { wm.removeView(it) } catch (_: Exception) {}
         }
         currentView = null
-
-        overlayView?.let {
-            val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            try { wm.removeView(it) } catch (_: Exception) {}
-        }
-        overlayView = null
     }
 }
