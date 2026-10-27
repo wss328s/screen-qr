@@ -7,12 +7,18 @@ import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.Result
 import com.google.zxing.common.HybridBinarizer
 
 /**
- * 强化识别：旋转重试 + 对比度增强 + 反色，应对畸形/反光/歪斜。
+ * 强化识别：返回内容+位置坐标，用于画框。
  */
 object QrDecoder {
+
+    data class DecodeResult(
+        val text: String,
+        val points: FloatArray? = null  // 二维码角点坐标
+    )
 
     private val reader = MultiFormatReader().apply {
         setHints(
@@ -23,39 +29,35 @@ object QrDecoder {
         )
     }
 
-    fun decode(bitmap: Bitmap): String? {
+    fun decode(bitmap: Bitmap): DecodeResult? {
         val w = bitmap.width
         val h = bitmap.height
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        // 路径1：正常
         var result = tryDecode(w, h, pixels, false)
         if (result != null) return result
 
-        // 路径2：反色（逆光/白码黑底）
         result = tryDecode(w, h, pixels, true)
         if (result != null) return result
 
-        // 路径3：旋转90度
         result = tryDecodeRotated(w, h, pixels, 90)
         if (result != null) return result
 
-        // 路径4：旋转180度
         result = tryDecodeRotated(w, h, pixels, 180)
         if (result != null) return result
 
-        // 路径5：增强对比度后再试（反光/低对比）
         result = tryDecodeEnhanced(w, h, pixels)
         return result
     }
 
-    private fun tryDecode(w: Int, h: Int, pixels: IntArray, invert: Boolean): String? {
+    private fun tryDecode(w: Int, h: Int, pixels: IntArray, invert: Boolean): DecodeResult? {
         return try {
             val src = RGBLuminanceSource(w, h, pixels)
             val source = if (invert) src.invert() else src
             val binary = BinaryBitmap(HybridBinarizer(source))
-            reader.decode(binary).text
+            val r = reader.decode(binary)
+            DecodeResult(r.text, r.resultPoints?.let { pts -> pts.flatMap { listOf(it.x, it.y) }.toFloatArray() })
         } catch (e: Exception) {
             null
         } finally {
@@ -63,12 +65,13 @@ object QrDecoder {
         }
     }
 
-    private fun tryDecodeRotated(w: Int, h: Int, pixels: IntArray, degrees: Int): String? {
+    private fun tryDecodeRotated(w: Int, h: Int, pixels: IntArray, degrees: Int): DecodeResult? {
         return try {
             val rotated = rotatePixels(pixels, w, h, degrees)
             val src = RGBLuminanceSource(rotated.width, rotated.height, rotated.pixels)
             val binary = BinaryBitmap(HybridBinarizer(src))
-            reader.decode(binary).text
+            val r = reader.decode(binary)
+            DecodeResult(r.text, r.resultPoints?.let { pts -> pts.flatMap { listOf(it.x, it.y) }.toFloatArray() })
         } catch (e: Exception) {
             null
         } finally {
@@ -76,9 +79,8 @@ object QrDecoder {
         }
     }
 
-    private fun tryDecodeEnhanced(w: Int, h: Int, pixels: IntArray): String? {
+    private fun tryDecodeEnhanced(w: Int, h: Int, pixels: IntArray): DecodeResult? {
         return try {
-            // 对比度增强：亮的更亮，暗的更暗
             val enhanced = IntArray(pixels.size)
             for (i in pixels.indices) {
                 val c = pixels[i]
@@ -92,7 +94,8 @@ object QrDecoder {
             }
             val src = RGBLuminanceSource(w, h, enhanced)
             val binary = BinaryBitmap(HybridBinarizer(src))
-            reader.decode(binary).text
+            val r = reader.decode(binary)
+            DecodeResult(r.text, r.resultPoints?.let { pts -> pts.flatMap { listOf(it.x, it.y) }.toFloatArray() })
         } catch (e: Exception) {
             null
         } finally {

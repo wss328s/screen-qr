@@ -188,11 +188,11 @@ class QrScanService : Service() {
                 }
             } else cropped
 
-            val text = QrDecoder.decode(scaled)
+            val result = QrDecoder.decode(scaled)
             scaled.recycle()
 
-            if (!text.isNullOrBlank()) {
-                if (GameState.parseAndRecord(text)) {
+            if (result != null) {
+                if (GameState.parseAndRecord(result.text)) {
                     qrCount++
                     found = true
                     FloatingResultManager.update(this)
