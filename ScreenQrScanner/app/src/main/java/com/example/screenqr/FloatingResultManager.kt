@@ -35,7 +35,7 @@ object FloatingResultManager {
                 Toast.makeText(ctx, "已复制全部结果", Toast.LENGTH_SHORT).show()
             }
             view.findViewById<Button>(R.id.closeBtn).setOnClickListener {
-                GameState.advance()
+                GameState.reset()
                 update(ctx)
             }
 
