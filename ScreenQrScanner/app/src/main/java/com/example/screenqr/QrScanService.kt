@@ -36,8 +36,8 @@ class QrScanService : Service() {
         private const val NOTI_ID = 1001
 
         private const val SCAN_INTERVAL_MS = 150L
-        private const val DEDUP_TTL_MS = 3000L
-        private const val SCALE_WIDTH = 300
+        private const val DEDUP_TTL_MS = 2000L
+        private const val SCALE_WIDTH = 400
 
         @Volatile
         var isRunning = false
@@ -61,8 +61,10 @@ class QrScanService : Service() {
 
     private val scanRunnable = object : Runnable {
         override fun run() {
-            scanOnce()
-            handler.postDelayed(this, SCAN_INTERVAL_MS)
+            val found = scanOnce()
+            // 识别失败立刻重试（不等150ms），成功了才等下一个周期
+            val delay = if (found) SCAN_INTERVAL_MS else 0L
+            handler.postDelayed(this, delay)
         }
     }
 
@@ -156,12 +158,13 @@ class QrScanService : Service() {
         handler.postDelayed(statusUpdateRunnable, 1000)
     }
 
-    private fun scanOnce() {
-        val reader = imageReader ?: return
+    private fun scanOnce(): Boolean {
+        val reader = imageReader ?: return false
         val image = try { reader.acquireLatestImage() } catch (e: Exception) { null }
-        image ?: return
+        image ?: return false
 
         frameCount++
+        var found = false
 
         try {
             val plane = image.planes[0]
@@ -189,18 +192,18 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (!text.isNullOrBlank()) {
-                // 尝试解析为比赛码（A31格式）
                 if (GameState.parseAndRecord(text)) {
                     qrCount++
+                    found = true
                     FloatingResultManager.update(this)
                     FloatingResultManager.notifyRead(this)
                 }
             }
         } catch (e: Exception) {
-            // 单帧失败不影响下一轮
         } finally {
             try { image.close() } catch (_: Exception) {}
         }
+        return found
     }
 
     private fun isDuplicate(content: String): Boolean {

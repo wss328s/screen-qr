@@ -33,7 +33,7 @@ object GameState {
 
     // 去重
     private val recentCodes = LinkedHashMap<String, Long>()
-    private val dedupTtl = 3000L
+    private val dedupTtl = 2000L
 
     fun reset() {
         legs.forEach { it.codes.clear() }
