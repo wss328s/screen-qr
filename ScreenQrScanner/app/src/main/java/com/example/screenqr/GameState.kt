@@ -1,8 +1,10 @@
 package com.example.screenqr
 
 /**
- * 比赛导航状态管理：4个岔路口，每个3个码，按扫描顺序记录，满3个比大小选最小。
- * 满3个后停下来等用户确认，手动点"下一组"才开始下一个岔路。
+ * 比赛导航：4个岔路，每个3个码，自动连续识别。
+ * - 同一个码2秒内不重复记录，换了新码立刻识别
+ * - 满3个自动跳到下一组，不停顿
+ * - 悬浮窗显示当前进度+已完成的结果
  */
 object GameState {
 
@@ -25,47 +27,47 @@ object GameState {
         private set
     var totalRead = 0
         private set
-    var currentLegDone = false
-        private set
+
+    // 去重：记录最近识别的内容和时间
+    private val recentCodes = LinkedHashMap<String, Long>()
+    private val dedupTtl = 2000L
 
     fun reset() {
         legs.forEach { it.codes.clear() }
         currentLegIndex = 0
         totalRead = 0
-        currentLegDone = false
-    }
-
-    fun advance() {
-        if (currentLegIndex < 3) {
-            currentLegIndex++
-            currentLegDone = false
-        }
+        recentCodes.clear()
     }
 
     /**
-     * 从内容里提取数字，按扫描顺序追加到当前组。
-     * 两个码之间至少间隔2.5秒，避免重复扫到同一个。
+     * 从内容里提取数字，按顺序记录。
+     * 同一个内容2秒内不重复记，新内容立刻记。
+     * 满3个自动跳到下一组。
      */
-    private var lastRecordTime = 0L
-    private val cooldownMs = 2000L
-
     fun parseAndRecord(raw: String): Boolean {
-        if (currentLegDone) return false
-        val now = System.currentTimeMillis()
-        if (now - lastRecordTime < cooldownMs) return false // 冷却中
         val s = raw.trim()
         val numStr = Regex("\\d+").find(s)?.value ?: return false
         val value = numStr.toIntOrNull() ?: return false
+
+        // 去重清理
+        val now = System.currentTimeMillis()
+        recentCodes.entries.removeIf { now - it.value > dedupTtl }
+        // 同一个内容2秒内不重复
+        if (recentCodes.containsKey(s)) return false
+
+        // 4个岔路都扫完了
+        if (currentLegIndex >= 3 && legs[3].isComplete) return false
 
         val leg = legs[currentLegIndex]
         if (leg.codes.size >= 3) return false
 
         leg.codes.add(value)
         totalRead++
-        lastRecordTime = now
+        recentCodes[s] = now
 
-        if (leg.isComplete) {
-            currentLegDone = true
+        // 满3个自动跳到下一组
+        if (leg.isComplete && currentLegIndex < 3) {
+            currentLegIndex++
         }
         return true
     }
@@ -76,16 +78,16 @@ object GameState {
         val sb = StringBuilder()
         sb.append("岔路$legNum/4 · 已读$totalRead/12\n")
 
-        // 显示已扫的码
         val parts = leg.codes.mapIndexed { i, v -> "码${i+1}:$v" }
         val display = parts.ifEmpty { listOf("码1:?","码2:?","码3:?") }
         sb.append(display.joinToString("  "))
 
-        if (currentLegDone && leg.isComplete) {
-            sb.append("\n✓ 推荐走第${leg.recommendedIndex()!!+1}个（${leg.recommendedValue()}最小）")
-        } else {
-            val need = 3 - leg.codes.size
-            sb.append("\n还差${need}个码")
+        // 显示之前完成的结果
+        for (i in 0 until currentLegIndex) {
+            val l = legs[i]
+            if (l.isComplete) {
+                sb.append("\n岔路${i+1}→走第${l.recommendedIndex()!!+1}个(${l.recommendedValue()})")
+            }
         }
         return sb.toString()
     }
