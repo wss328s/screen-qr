@@ -30,7 +30,7 @@ object GameState {
 
     // 去重：记录最近识别的内容和时间
     private val recentCodes = LinkedHashMap<String, Long>()
-    private val dedupTtl = 2000L
+    private val dedupTtl = 3000L
 
     fun reset() {
         legs.forEach { it.codes.clear() }
