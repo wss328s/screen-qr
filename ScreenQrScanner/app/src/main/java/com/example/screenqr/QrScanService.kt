@@ -146,6 +146,10 @@ class QrScanService : Service() {
             return
         }
 
+        // 重置比赛状态，显示悬浮窗
+        GameState.reset()
+        FloatingResultManager.update(this)
+
         isRunning = true
         updateStatusNotification()
         handler.postDelayed(scanRunnable, 300)
@@ -184,9 +188,13 @@ class QrScanService : Service() {
             val text = QrDecoder.decode(scaled)
             scaled.recycle()
 
-            if (!text.isNullOrBlank() && !isDuplicate(text)) {
-                qrCount++
-                FloatingResultManager.show(this, text)
+            if (!text.isNullOrBlank()) {
+                // 尝试解析为比赛码（A31格式）
+                if (GameState.parseAndRecord(text)) {
+                    qrCount++
+                    FloatingResultManager.update(this)
+                    FloatingResultManager.notifyRead(this)
+                }
             }
         } catch (e: Exception) {
             // 单帧失败不影响下一轮
