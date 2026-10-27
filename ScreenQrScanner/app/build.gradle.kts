@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.screenqr"
+        applicationId = "com.dji.km888"
         minSdk = 24          // Android 7.0 及以上
         targetSdk = 34
         versionCode = 1
