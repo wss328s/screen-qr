@@ -1,13 +1,14 @@
 package com.example.screenqr
 
 /**
- * 扫码历史：记录扫到的所有内容，简单列表。
+ * 纯扫码历史：只存扫到的内容，不做比赛逻辑。
  */
 object ScanHistory {
 
-    val items = mutableListOf<String>()
+    private val items = mutableListOf<String>()
+    private const val MAX_ITEMS = 10
     private val recentCodes = LinkedHashMap<String, Long>()
-    private val dedupTtl = 5000L
+    private const val DEDUP_TTL = 5000L
 
     fun reset() {
         items.clear()
@@ -18,12 +19,12 @@ object ScanHistory {
         val s = raw.trim()
         if (s.isEmpty()) return false
 
-        // 去重：同一个内容5秒内不重复
         val now = System.currentTimeMillis()
-        recentCodes.entries.removeIf { now - it.value > dedupTtl }
+        recentCodes.entries.removeIf { now - it.value > DEDUP_TTL }
         if (recentCodes.containsKey(s)) return false
 
         items.add(s)
+        if (items.size > MAX_ITEMS) items.removeAt(0)
         recentCodes[s] = now
         return true
     }
@@ -31,13 +32,13 @@ object ScanHistory {
     fun statusText(): String {
         if (items.isEmpty()) return "等待扫码..."
         val sb = StringBuilder()
-        items.takeLast(10).forEachIndexed { i, content ->
-            sb.append("第${items.size - items.takeLast(10).size + i + 1}个: $content\n")
+        items.forEachIndexed { i, content ->
+            sb.append("第${i+1}个: $content\n")
         }
         return sb.toString().trimEnd()
     }
 
     fun fullSummary(): String {
-        return items.mapIndexed { i, content -> "第${i+1}个: $content" }.joinToString("\n")
+        return items.joinToString("\n")
     }
 }
