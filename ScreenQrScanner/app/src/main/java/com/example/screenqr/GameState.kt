@@ -38,7 +38,7 @@ object GameState {
     fun parseAndRecord(raw: String): Boolean {
         val s = raw.trim()
         val m = Regex("^([ABCabc])\\s*(\\d+)$").find(s) ?: return false
-        val dir = m.groupValues[1].uppercaseChar()
+        val dir = m.groupValues[1].first().uppercaseChar()
         val value = m.groupValues[2].toIntOrNull() ?: return false
 
         val leg = legs[currentLegIndex]
