@@ -35,9 +35,9 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        private const val SCAN_INTERVAL_MS = 150L
+        private const val SCAN_INTERVAL_MS = 120L
         private const val DEDUP_TTL_MS = 5000L
-        private const val SCALE_WIDTH = 0  // 0=不缩放，用原图
+        private const val SCALE_WIDTH = 1200
 
         @Volatile
         var isRunning = false
