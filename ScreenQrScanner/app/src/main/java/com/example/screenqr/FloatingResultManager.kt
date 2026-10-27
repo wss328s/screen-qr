@@ -74,7 +74,7 @@ object FloatingResultManager {
     private fun vibrate(ctx: Context) {
         val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMBIENT_DEFAULT))
+            v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
         } else {
             @Suppress("DEPRECATION")
             v.vibrate(80)
