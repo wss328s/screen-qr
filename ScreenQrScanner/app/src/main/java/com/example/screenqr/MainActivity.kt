@@ -45,6 +45,11 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         refreshStatus()
+
+        // 打开APP就自动请求权限，不用手动点启动按钮
+        if (!QrScanService.isRunning) {
+            ensurePermissionsAndStart()
+        }
     }
 
     private fun ensurePermissionsAndStart() {
