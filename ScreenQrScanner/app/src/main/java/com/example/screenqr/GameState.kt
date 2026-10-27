@@ -91,4 +91,19 @@ object GameState {
         }
         return sb.toString()
     }
+
+    fun fullSummary(): String {
+        val sb = StringBuilder()
+        legs.forEachIndexed { i, leg ->
+            sb.append("岔路${i+1}: ")
+            if (leg.isComplete) {
+                sb.append(leg.codes.joinToString(" "))
+                sb.append(" → 走第${leg.recommendedIndex()!!+1}个(${leg.recommendedValue()}最小)")
+            } else {
+                sb.append("已识别 ${leg.codes.size}/3")
+            }
+            sb.append("\n")
+        }
+        return sb.toString()
+    }
 }
