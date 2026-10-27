@@ -35,9 +35,9 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        private const val SCAN_INTERVAL_MS = 100L
+        private const val SCAN_INTERVAL_MS = 150L
         private const val DEDUP_TTL_MS = 5000L
-        private const val SCALE_WIDTH = 1920
+        private const val SCALE_WIDTH = 1500
 
         @Volatile
         var isRunning = false
@@ -194,9 +194,6 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (result != null) {
-                // 更新红框位置
-                FloatingResultManager.updateRect(result.points, scaledW, scaledH, screenW, screenH)
-
                 if (GameState.parseAndRecord(result.text)) {
                     qrCount++
                     found = true
