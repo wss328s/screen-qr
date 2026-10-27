@@ -34,7 +34,10 @@ object FloatingResultManager {
                 cm.setPrimaryClip(ClipData.newPlainText("game", GameState.fullSummary()))
                 Toast.makeText(ctx, "已复制全部结果", Toast.LENGTH_SHORT).show()
             }
-            view.findViewById<Button>(R.id.closeBtn).setOnClickListener { hideAll(ctx) }
+            view.findViewById<Button>(R.id.closeBtn).setOnClickListener {
+                GameState.advance()
+                update(ctx)
+            }
 
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
