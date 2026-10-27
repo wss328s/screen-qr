@@ -82,8 +82,8 @@ object GameState {
         val display = parts.ifEmpty { listOf("码1:?","码2:?","码3:?") }
         sb.append(display.joinToString("  "))
 
-        // 显示之前完成的结果
-        for (i in 0 until currentLegIndex) {
+        // 显示所有已完成的岔路结果
+        for (i in 0..3) {
             val l = legs[i]
             if (l.isComplete) {
                 sb.append("\n岔路${i+1}→走第${l.recommendedIndex()!!+1}个(${l.recommendedValue()})")
