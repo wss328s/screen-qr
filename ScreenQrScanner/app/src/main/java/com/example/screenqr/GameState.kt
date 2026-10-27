@@ -1,22 +1,22 @@
 package com.example.screenqr
 
 /**
- * 比赛导航状态管理：4个岔路口，每个ABC三个码，识别满3个比较出最小方向。
+ * 比赛导航状态管理：4个岔路口，每个3个码，按扫描顺序记录，满3个比大小选最小。
  * 满3个后停下来等用户确认，手动点"下一组"才开始下一个岔路。
  */
 object GameState {
 
     data class Leg(
-        val codes: MutableMap<Char, Int> = mutableMapOf()
+        val codes: MutableList<Int> = mutableListOf()
     ) {
         val isComplete: Boolean get() = codes.size == 3
-        fun recommended(): Char? {
+        fun recommendedIndex(): Int? {
             if (!isComplete) return null
-            return codes.entries.minByOrNull { it.value }!!.key
+            return codes.indexOf(codes.minOrNull()!!)
         }
         fun recommendedValue(): Int? {
             if (!isComplete) return null
-            return codes.entries.minByOrNull { it.value }!!.value
+            return codes.minOrNull()
         }
     }
 
@@ -25,7 +25,6 @@ object GameState {
         private set
     var totalRead = 0
         private set
-    // 当前组是否已完成（等用户确认）
     var currentLegDone = false
         private set
 
@@ -36,9 +35,6 @@ object GameState {
         currentLegDone = false
     }
 
-    /**
-     * 用户点"下一组"，进入下一个岔路口。
-     */
     fun advance() {
         if (currentLegIndex < 3) {
             currentLegIndex++
@@ -47,24 +43,22 @@ object GameState {
     }
 
     /**
-     * 尝试解析一个二维码内容。
-     * 从内容里提取数字作为数值，按识别顺序填入当前组的下一个空位（A→B→C）。
+     * 从内容里提取数字，按扫描顺序追加到当前组。
      */
     fun parseAndRecord(raw: String): Boolean {
-        if (currentLegDone) return false // 当前组已完成，等用户点下一组
+        if (currentLegDone) return false
         val s = raw.trim()
         val numStr = Regex("\\d+").find(s)?.value ?: return false
         val value = numStr.toIntOrNull() ?: return false
 
         val leg = legs[currentLegIndex]
-        val order = listOf('A', 'B', 'C')
-        val nextDir = order.firstOrNull { !leg.codes.containsKey(it) } ?: return false
+        if (leg.codes.size >= 3) return false
 
-        leg.codes[nextDir] = value
+        leg.codes.add(value)
         totalRead++
 
         if (leg.isComplete) {
-            currentLegDone = true // 完成，停下来等用户确认
+            currentLegDone = true
         }
         return true
     }
@@ -75,14 +69,13 @@ object GameState {
         val sb = StringBuilder()
         sb.append("岔路$legNum/4 · 已读$totalRead/12\n")
 
-        val parts = listOf('A', 'B', 'C').map { dir ->
-            val v = leg.codes[dir]
-            if (v != null) "$dir:$v" else "$dir:?"
-        }
-        sb.append(parts.joinToString("  "))
+        // 显示已扫的码
+        val parts = leg.codes.mapIndexed { i, v -> "码${i+1}:$v" }
+        val display = parts.ifEmpty { listOf("码1:?","码2:?","码3:?") }
+        sb.append(display.joinToString("  "))
 
         if (currentLegDone && leg.isComplete) {
-            sb.append("\n✓ 推荐走${leg.recommended()}（${leg.recommendedValue()}最小）")
+            sb.append("\n✓ 推荐走第${leg.recommendedIndex()!!+1}个（${leg.recommendedValue()}最小）")
         } else {
             val need = 3 - leg.codes.size
             sb.append("\n还差${need}个码")
@@ -95,13 +88,11 @@ object GameState {
         legs.forEachIndexed { i, leg ->
             sb.append("岔路${i + 1}: ")
             if (leg.isComplete) {
-                val a = leg.codes['A']
-                val b = leg.codes['B']
-                val c = leg.codes['C']
-                sb.append("A$a B$b C$c → 走${leg.recommended()}")
+                sb.append(leg.codes.joinToString(" "))
+                sb.append(" → 走第${leg.recommendedIndex()!!+1}个（${leg.recommendedValue()}最小）")
             } else {
                 sb.append("已识别 ${leg.codes.size}/3")
-                leg.codes.forEach { (d, v) -> sb.append(" $d:$v") }
+                leg.codes.forEachIndexed { i, v -> sb.append(" 码${i+1}:$v") }
             }
             sb.append("\n")
         }
