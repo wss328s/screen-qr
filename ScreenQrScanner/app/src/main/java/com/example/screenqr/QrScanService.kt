@@ -23,11 +23,6 @@ import android.view.WindowManager
 
 /**
  * 前台服务：持续截屏 -> ZXing 识别 -> 悬浮窗弹出结果。
- *
- * 关键调参：
- *  - SCAN_INTERVAL_MS：识别间隔。越小越跟手，但越费电。建议 500~800ms。
- *  - DEDUP_TTL_MS：同一内容多久内不重复弹。避免你盯着同一个二维码时疯狂弹窗。
- *  - SCALE_WIDTH：识别前把帧缩到多宽。二维码一般几十像素就够，缩小能大幅加速。
  */
 class QrScanService : Service() {
 
@@ -40,8 +35,8 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        private const val SCAN_INTERVAL_MS = 100L
-        private const val DEDUP_TTL_MS = 1000L
+        private const val SCAN_INTERVAL_MS = 250L
+        private const val DEDUP_TTL_MS = 1500L
         private const val SCALE_WIDTH = 400
 
         @Volatile
@@ -59,10 +54,22 @@ class QrScanService : Service() {
     private var screenH = 0
     private var density = 0
 
+    // 诊断计数
+    private var frameCount = 0
+    private var qrCount = 0
+    private var startTimestamp = 0L
+
     private val scanRunnable = object : Runnable {
         override fun run() {
             scanOnce()
             handler.postDelayed(this, SCAN_INTERVAL_MS)
+        }
+    }
+
+    private val statusUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateStatusNotification()
+            handler.postDelayed(this, 2000)
         }
     }
 
@@ -71,13 +78,7 @@ class QrScanService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        val noti: Notification = Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("屏幕二维码识别中")
-            .setContentText("正在后台连续监听屏幕二维码")
-            .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setOngoing(true)
-            .build()
-        startForeground(NOTI_ID, noti)
+        startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -108,7 +109,12 @@ class QrScanService : Service() {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = mpm.getMediaProjection(resultCode, data)
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
-            override fun onStop() { stopSelf() }
+            override fun onStop() {
+                // 系统主动停止截屏，不要直接杀服务，更新通知让用户看到
+                handler.post {
+                    updateStatusNotification()
+                }
+            }
         }, null)
 
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -119,23 +125,39 @@ class QrScanService : Service() {
         screenH = metrics.heightPixels
         density = metrics.densityDpi
 
-        // ImageReader 缓冲 2 帧，避免丢帧
-        imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2)
-        virtualDisplay = mediaProjection?.createVirtualDisplay(
-            "ScreenQrCapture",
-            screenW, screenH, density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            imageReader!!.surface, null, null
-        )
+        startTimestamp = System.currentTimeMillis()
+        frameCount = 0
+        qrCount = 0
+
+        try {
+            imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2)
+            virtualDisplay = mediaProjection?.createVirtualDisplay(
+                "ScreenQrCapture",
+                screenW, screenH, density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                imageReader!!.surface, null, null
+            )
+            if (virtualDisplay == null) {
+                updateStatusNotification("错误", "VirtualDisplay 创建失败，系统不允许截屏")
+                return
+            }
+        } catch (e: Exception) {
+            updateStatusNotification("错误", "截屏初始化异常: ${e.message}")
+            return
+        }
 
         isRunning = true
+        updateStatusNotification()
         handler.postDelayed(scanRunnable, 300)
+        handler.postDelayed(statusUpdateRunnable, 1000)
     }
 
     private fun scanOnce() {
         val reader = imageReader ?: return
         val image = try { reader.acquireLatestImage() } catch (e: Exception) { null }
         image ?: return
+
+        frameCount++
 
         try {
             val plane = image.planes[0]
@@ -148,7 +170,6 @@ class QrScanService : Service() {
             val bitmap = Bitmap.createBitmap(fullW, screenH, Bitmap.Config.ARGB_8888)
             bitmap.copyPixelsFromBuffer(buffer)
 
-            // 裁剪掉右边 padding，再缩放到 SCALE_WIDTH 加速识别
             val cropped = if (fullW != screenW) {
                 Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
             } else bitmap
@@ -164,6 +185,7 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (!text.isNullOrBlank() && !isDuplicate(text)) {
+                qrCount++
                 FloatingResultManager.show(this, text)
             }
         } catch (e: Exception) {
@@ -181,6 +203,27 @@ class QrScanService : Service() {
         return false
     }
 
+    private fun buildNotification(title: String, text: String): Notification {
+        return Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun updateStatusNotification(title: String? = null, text: String? = null) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val elapsed = (System.currentTimeMillis() - startTimestamp) / 1000
+        val finalTitle = title ?: "屏幕二维码识别中"
+        val finalText = text ?: if (frameCount == 0 && elapsed > 3) {
+            "已运行${elapsed}秒，未获取到画面（系统可能禁止截屏）"
+        } else {
+            "已截${frameCount}帧，识别${qrCount}个码（${elapsed}秒）"
+        }
+        nm.notify(NOTI_ID, buildNotification(finalTitle, finalText))
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
@@ -194,6 +237,7 @@ class QrScanService : Service() {
     override fun onDestroy() {
         isRunning = false
         handler.removeCallbacks(scanRunnable)
+        handler.removeCallbacks(statusUpdateRunnable)
         try { virtualDisplay?.release() } catch (_: Exception) {}
         try { imageReader?.close() } catch (_: Exception) {}
         try { mediaProjection?.stop() } catch (_: Exception) {}
