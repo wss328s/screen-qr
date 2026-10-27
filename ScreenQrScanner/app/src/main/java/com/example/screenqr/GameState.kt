@@ -44,9 +44,15 @@ object GameState {
 
     /**
      * 从内容里提取数字，按扫描顺序追加到当前组。
+     * 两个码之间至少间隔2.5秒，避免重复扫到同一个。
      */
+    private var lastRecordTime = 0L
+    private val cooldownMs = 2000L
+
     fun parseAndRecord(raw: String): Boolean {
         if (currentLegDone) return false
+        val now = System.currentTimeMillis()
+        if (now - lastRecordTime < cooldownMs) return false // 冷却中
         val s = raw.trim()
         val numStr = Regex("\\d+").find(s)?.value ?: return false
         val value = numStr.toIntOrNull() ?: return false
@@ -56,6 +62,7 @@ object GameState {
 
         leg.codes.add(value)
         totalRead++
+        lastRecordTime = now
 
         if (leg.isComplete) {
             currentLegDone = true
