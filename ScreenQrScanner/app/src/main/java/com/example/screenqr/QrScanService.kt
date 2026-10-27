@@ -178,12 +178,20 @@ class QrScanService : Service() {
                 Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
             } else bitmap
 
-            val scaleH = (SCALE_WIDTH * screenH / screenW.toFloat()).toInt()
-            val scaled = if (screenW > SCALE_WIDTH) {
-                Bitmap.createScaledBitmap(cropped, SCALE_WIDTH, scaleH, false).also {
-                    if (it != cropped) cropped.recycle()
+            // 只识别中心70%区域，二维码占比更大，识别更快
+            val cropW = (screenW * 0.7f).toInt()
+            val cropH = (screenH * 0.7f).toInt()
+            val offsetX = (screenW - cropW) / 2
+            val offsetY = (screenH - cropH) / 2
+            val center = Bitmap.createBitmap(cropped, offsetX, offsetY, cropW, cropH)
+            if (center != cropped) cropped.recycle()
+
+            val scaleH = (SCALE_WIDTH * cropH / cropW.toFloat()).toInt()
+            val scaled = if (cropW > SCALE_WIDTH) {
+                Bitmap.createScaledBitmap(center, SCALE_WIDTH, scaleH, false).also {
+                    if (it != center) center.recycle()
                 }
-            } else cropped
+            } else center
 
             val text = QrDecoder.decode(scaled)
             scaled.recycle()
