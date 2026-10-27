@@ -35,9 +35,9 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        private const val SCAN_INTERVAL_MS = 100L
+        private const val SCAN_INTERVAL_MS = 150L
         private const val DEDUP_TTL_MS = 5000L
-        private const val SCALE_WIDTH = 800
+        private const val SCALE_WIDTH = 0  // 0=不缩放，用原图
 
         @Volatile
         var isRunning = false
@@ -181,8 +181,8 @@ class QrScanService : Service() {
                 Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
             } else bitmap
 
-            val scaleH = (SCALE_WIDTH * screenH / screenW.toFloat()).toInt()
-            val scaled = if (screenW > SCALE_WIDTH) {
+            val scaled = if (SCALE_WIDTH > 0 && screenW > SCALE_WIDTH) {
+                val scaleH = (SCALE_WIDTH * screenH / screenW.toFloat()).toInt()
                 Bitmap.createScaledBitmap(cropped, SCALE_WIDTH, scaleH, false).also {
                     if (it != cropped) cropped.recycle()
                 }
