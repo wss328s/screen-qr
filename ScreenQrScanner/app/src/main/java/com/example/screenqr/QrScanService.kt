@@ -35,8 +35,10 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        // 识别解码的最大宽度（保护上限，QR识别不需要更高）
+        // 全图增强档的最大宽度（保护上限，QR识别不需要更高）
         private const val MAX_DECODE_WIDTH = 1920
+        // 快速档目标宽度：小图先跑，像素少→快；清晰码在此命中
+        private const val FAST_DECODE_WIDTH = 720
 
         @Volatile
         var isRunning = false
@@ -185,7 +187,7 @@ class QrScanService : Service() {
         mainHandler.postDelayed(statusUpdateRunnable, 1000)
     }
 
-    /** 处理一帧：廉价运动采样 -> 速率门 -> ROI灰度提取 -> 纯色拒绝 -> native解码 */
+    /** 处理一帧：运动采样 -> 速率门 -> 源帧拷贝 -> 小图快速档 -> (未中)全图重档 */
     private fun handleFrame(image: android.media.Image) {
         frameCount++
         try {
@@ -197,61 +199,82 @@ class QrScanService : Service() {
             val imgH = image.height
             val now = android.os.SystemClock.elapsedRealtime()
 
-            // 1) 廉价运动采样（256点，直接读原始缓冲），画面变化 -> 突发 1.5 秒
+            // 1) 廉价运动采样（256点），画面变化 -> 突发 1.5 秒
             if (sampleMotion(srcBuffer, srcRowStride, pixelStride, imgW, imgH)) {
                 burstUntilElapsed = now + 1500L
             }
 
-            // 2) 有效扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
+            // 2) 扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
             val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
 
-            // 3) 速率门：未到间隔则跳过（运动采样已做，开销极小），避免密集提取/解码
+            // 3) 速率门：未到间隔则跳过，避免密集提取/解码
             if (!shouldDispatch(now, interval)) return
 
-            // 4) ROI 单遍 裁剪 + 降采样 + 转灰度（不建 Bitmap）
+            // 4) 源帧一次性拷贝（两级解码复用，不重复拷全屏）
+            FrameExtractor.copySource(srcBuffer)
             val bounds = SettingsManager.getRegionBounds(this)
-            val maxDim = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
-            val frame = FrameExtractor.extract(
-                srcBuffer, srcRowStride, pixelStride,
-                imgW, imgH, bounds, maxDim
-            ) ?: return
 
-            // 5) 黑屏/纯色帧解码前拒绝（QR 码本身高对比，不会被误判）
-            if (isFrameFlat(frame.gray, frame.width, frame.height, frame.rowStride)) return
-
-            // 6) native 一次解码（灰度直喂，最快）
-            frame.gray.rewind()
-            val result = QrDecoder.decode(
-                frame.gray, frame.rowStride, frame.width, frame.height, enhanceMode
+            // 5) 第一级：小图 + 最快配置（清晰正向码在此命中，耗时最低）
+            val smallMax = if (scaleWidth > 0) minOf(scaleWidth, FAST_DECODE_WIDTH) else FAST_DECODE_WIDTH
+            val small = FrameExtractor.extract(
+                srcRowStride, pixelStride, imgW, imgH, bounds, smallMax
             )
+            if (small != null && !isFrameFlat(small.gray, small.width, small.height, small.rowStride)) {
+                small.gray.rewind()
+                val fast = QrDecoder.decodeFast(small.gray, small.rowStride, small.width, small.height)
+                if (fast != null) {
+                    processResult(fast)
+                    return
+                }
+            }
 
-            if (result != null) {
-                if (workMode == SettingsManager.MODE_GAME) {
-                    // 比赛导航模式
-                    val isNew = GameState.parseAndRecord(result.text)
-                    if (isNew) {
-                        qrCount++
-                        mainHandler.post {
-                            FloatingResultManager.update(this)
-                            FloatingResultManager.notifyRead(this)
-                        }
-                    }
-                } else {
-                    // 纯扫码模式
-                    val isNew = ScanHistory.add(result.text)
-                    val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
-
-                    if (isNew) {
-                        qrCount++
-                        mainHandler.post { FloatingResultManager.update(this) }
-                    }
-
-                    if (shouldNotify) {
-                        mainHandler.post { FloatingResultManager.notifyRead(this) }
+            // 6) 第二级：仅在突发期（新码可能出现）或非关闭档，用全图 + 重配置
+            val doHeavy = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
+            if (doHeavy) {
+                val largeMax = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
+                val large = FrameExtractor.extract(
+                    srcRowStride, pixelStride, imgW, imgH, bounds, largeMax
+                )
+                if (large != null && !isFrameFlat(large.gray, large.width, large.height, large.rowStride)) {
+                    large.gray.rewind()
+                    val heavy = QrDecoder.decodeHeavy(
+                        large.gray, large.rowStride, large.width, large.height, enhanceMode
+                    )
+                    if (heavy != null) {
+                        processResult(heavy)
+                        return
                     }
                 }
             }
         } catch (e: Exception) {
+        }
+    }
+
+    /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈 */
+    private fun processResult(result: QrDecoder.DecodeResult) {
+        if (workMode == SettingsManager.MODE_GAME) {
+            // 比赛导航模式
+            val isNew = GameState.parseAndRecord(result.text)
+            if (isNew) {
+                qrCount++
+                mainHandler.post {
+                    FloatingResultManager.update(this)
+                    FloatingResultManager.notifyRead(this)
+                }
+            }
+        } else {
+            // 纯扫码模式
+            val isNew = ScanHistory.add(result.text)
+            val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
+
+            if (isNew) {
+                qrCount++
+                mainHandler.post { FloatingResultManager.update(this) }
+            }
+
+            if (shouldNotify) {
+                mainHandler.post { FloatingResultManager.notifyRead(this) }
+            }
         }
     }
 

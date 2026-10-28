@@ -6,11 +6,13 @@ import java.nio.ByteBuffer
  * 帧提取器：从截屏 RGBA 缓冲区中，按 ROI 单遍完成"裁剪 + 降采样 + 转灰度"，
  * 直接产出可喂给 zxingcpp native（readYBuffer）的灰度数据。
  *
+ * 流程：
+ * 1) [copySource] 每帧只调用一次，把源平面一次性 bulk 拷贝到堆内（供两级解码复用）；
+ * 2) [extract] 可在同一源帧上调用多次（小图快速档 / 全图增强档），复用同一输出缓冲。
+ *
  * 相比"先建全屏 Bitmap -> 再缩放 -> 再让 native 转灰度"的旧路径：
  * - 不创建任何 Bitmap，不分配全屏内存；
  * - 只处理 ROI 内的像素，且只读一次；
- * - 源帧一次性 bulk 拷贝到堆内后做快速数组访问，避免逐像素 JNI 调用；
- * - 源/目标缓冲均复用，避免每帧分配（尤其 native 直接内存）；
  * - 输出 1 字节/像素的灰度，数据量是 RGBA 的 1/4。
  */
 object FrameExtractor {
@@ -26,9 +28,28 @@ object FrameExtractor {
     private var srcCopy: ByteArray = ByteArray(0)
     // 复用的输出灰度缓冲（直接内存，避免每帧分配 native 内存）
     private var outBuf: ByteBuffer = ByteBuffer.allocateDirect(1)
+    // 已拷贝的源字节数
+    private var copied: Int = 0
 
     /**
-     * @param buffer      截屏第一个平面（RGBA）的 ByteBuffer
+     * 每帧调用一次：把源平面 bulk 拷贝到堆内，之后多次 [extract] 复用，
+     * 避免两级解码各拷一遍全屏。
+     *
+     * @return 实际拷贝的字节数
+     */
+    fun copySource(buffer: ByteBuffer): Int {
+        val cap = buffer.capacity()
+        if (srcCopy.size < cap) srcCopy = ByteArray(cap)
+        buffer.rewind()
+        val n = buffer.remaining()
+        buffer.get(srcCopy, 0, n)
+        copied = n
+        return n
+    }
+
+    /**
+     * 基于已拷贝的源帧，按 ROI 裁剪 + 降采样 + 转灰度。
+     *
      * @param srcRowStride 平面 rowStride（字节）
      * @param pixelStride  平面 pixelStride（RGBA 通常为 4）
      * @param srcW/srcH    源图像尺寸
@@ -36,7 +57,6 @@ object FrameExtractor {
      * @param maxDimension 输出最长边上限（0=不限制）
      */
     fun extract(
-        buffer: ByteBuffer,
         srcRowStride: Int,
         pixelStride: Int,
         srcW: Int,
@@ -64,20 +84,14 @@ object FrameExtractor {
         val outH = (roiH + step - 1) / step
         if (outW < 16 || outH < 16) return null
 
-        // 1) 一次性把源平面 bulk 拷到堆内（复用 srcCopy），之后全是快速数组访问
-        val cap = buffer.capacity()
-        if (srcCopy.size < cap) srcCopy = ByteArray(cap)
-        buffer.rewind()
-        val n = buffer.remaining()
-        buffer.get(srcCopy, 0, n)
-
-        // 2) 确保输出直接缓冲足够（复用，避免每帧分配 native 内存）
+        // 确保输出直接缓冲足够（复用，避免每帧分配 native 内存；小图/大图共用，按需增长）
         val outNeeded = outW * outH
         if (outBuf.capacity() < outNeeded) {
             outBuf = ByteBuffer.allocateDirect(outNeeded)
         }
 
-        // 3) 单遍 裁剪 + 降采样 + 转灰度
+        // 单遍 裁剪 + 降采样 + 转灰度
+        val n = copied
         for (oy in 0 until outH) {
             val sy = t + oy * step
             val srcRowBase = sy * srcRowStride

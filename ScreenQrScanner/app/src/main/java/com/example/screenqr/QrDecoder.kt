@@ -6,13 +6,14 @@ import java.nio.ByteBuffer
 /**
  * 识别解码器：使用 zxing-cpp native 库（C++ 机器码），直接读取灰度帧。
  *
- * 关键点：
- * - 输入已是 FrameExtractor 按 ROI 裁剪/降采样后的灰度（1 字节/像素），
- *   不再经过 Bitmap，native 也无需再做 RGBA->灰度转换（最快路径）；
- * - native 一次调用即可同时处理 多码、旋转、反色、降采样、去噪，无需 Java 层反复尝试；
- * - 针对 模糊（去噪/tryHarder）、反光/阴影（LOCAL_AVERAGE 局部二值化）、
- *   低对比、畸形/倾斜（tryRotate 任意角度）、白码黑底（tryInvert）；
- * - 输出纯文本（TextMode.PLAIN）。
+ * 采用两级级联（先快后全），由 QrScanService 调度：
+ * - [decodeFast]：最快配置（全局直方图二值化、不 tryHarder/旋转/反色、找到一个即停），
+ *   清晰、正向的二维码在此一次命中，耗时最低；
+ * - [decodeHeavy]：仅在快速档未命中时调用，重配置（局部均值二值化 + tryHarder +
+ *   旋转 + 反色，增强档再开降采样/去噪），覆盖小码/模糊/反光/倾斜/反色。
+ *
+ * 输入已是 FrameExtractor 产出的灰度（1 字节/像素），不经过 Bitmap，
+ * native 也无需再做 RGBA->灰度转换（最快路径）。
  */
 object QrDecoder {
 
@@ -23,34 +24,63 @@ object QrDecoder {
 
     private val reader = BarcodeReader()
 
-    fun decode(
+    /** 快速档：最低工作量，处理清晰正向二维码。 */
+    fun decodeFast(
+        gray: ByteBuffer,
+        rowStride: Int,
+        width: Int,
+        height: Int
+    ): DecodeResult? {
+        val options = BarcodeReader.Options(
+            formats = setOf(BarcodeReader.Format.QR_CODE),
+            tryHarder = false,
+            tryRotate = false,
+            tryInvert = false,
+            tryDownscale = false,
+            tryDenoise = false,
+            // 全局直方图二值化：屏幕画面干净、对比度高，速度最快
+            binarizer = BarcodeReader.Binarizer.GLOBAL_HISTOGRAM,
+            // 找到一个即停（早期退出）
+            maxNumberOfSymbols = 1,
+            textMode = BarcodeReader.TextMode.PLAIN
+        )
+        reader.options = options
+        return runDecode(gray, rowStride, width, height)
+    }
+
+    /** 重档：快速档未命中时调用，覆盖各种困难情况。 */
+    fun decodeHeavy(
         gray: ByteBuffer,
         rowStride: Int,
         width: Int,
         height: Int,
         enhanceMode: Int = SettingsManager.ENHANCE_STD
     ): DecodeResult? {
-        // 根据增强档位设置 native 选项
         val options = BarcodeReader.Options(
             formats = setOf(BarcodeReader.Format.QR_CODE),
-            // 关闭：只做最基础的正向识别（最快）
             tryHarder = enhanceMode != SettingsManager.ENHANCE_OFF,
-            // 图传画面非正对：任意角度旋转；标准/增强都开
             tryRotate = enhanceMode != SettingsManager.ENHANCE_OFF,
-            // 白码黑底/反色
             tryInvert = enhanceMode != SettingsManager.ENHANCE_OFF,
-            // 增强档：降采样尝试 + 去噪（小码/模糊/虚焦）
+            // 仅增强档开降采样尝试 + 去噪（小码/模糊/虚焦）
             tryDownscale = enhanceMode == SettingsManager.ENHANCE_STRONG,
             tryDenoise = enhanceMode == SettingsManager.ENHANCE_STRONG,
-            // 局部均值二值化，对强反光/阴影/光照不均更稳
+            // 局部均值二值化：强反光/阴影/光照不均更稳
             binarizer = BarcodeReader.Binarizer.LOCAL_AVERAGE,
-            // 输出纯文本，不带 HRI 前缀
+            maxNumberOfSymbols = 1,
             textMode = BarcodeReader.TextMode.PLAIN
         )
         reader.options = options
+        return runDecode(gray, rowStride, width, height)
+    }
 
+    private fun runDecode(
+        gray: ByteBuffer,
+        rowStride: Int,
+        width: Int,
+        height: Int
+    ): DecodeResult? {
         return try {
-            // 灰度帧一次 native 读取，返回所有识别到的码
+            // 灰度帧一次 native 读取
             val results = reader.readGray(gray, rowStride, width, height)
             val first = results.firstOrNull { !it.text.isNullOrBlank() }
             first?.let { r ->
