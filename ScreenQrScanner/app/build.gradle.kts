@@ -34,6 +34,5 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    // 纯 ZXing 离线识别，不依赖 Google Play Services
-    implementation("com.google.zxing:core:3.5.3")
+    // 二维码识别改用 zxing-cpp native（jniLibs 内置），无需 Java ZXing，也不依赖 Google Play Services
 }
