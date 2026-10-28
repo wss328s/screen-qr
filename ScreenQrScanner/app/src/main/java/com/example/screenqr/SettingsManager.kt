@@ -14,6 +14,7 @@ object SettingsManager {
     const val FPS_1 = 1   // 1000ms
     const val FPS_2 = 2   // 500ms
     const val FPS_5 = 5   // 200ms
+    const val FPS_7_5 = 7 // 133ms (7.5帧/秒)
     const val FPS_10 = 10 // 100ms
     const val DEFAULT_FPS = FPS_5
 
@@ -72,5 +73,8 @@ object SettingsManager {
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()
 
     // 工具方法：帧/秒 -> 间隔ms
-    fun fpsToIntervalMs(fps: Int): Long = (1000.0 / fps).toLong()
+    fun fpsToIntervalMs(fps: Int): Long = when (fps) {
+        FPS_7_5 -> 133L
+        else -> (1000.0 / fps).toLong()
+    }
 }

@@ -1,7 +1,10 @@
 package com.example.screenqr
 
 import android.app.AlertDialog
+import android.graphics.Color
 import android.os.Bundle
+import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -11,12 +14,12 @@ import androidx.appcompat.app.AppCompatActivity
 
 class SettingsActivity : AppCompatActivity() {
 
-    private lateinit var fpsText: TextView
-    private lateinit var dedupText: TextView
-    private lateinit var enhanceText: TextView
-    private lateinit var scaleText: TextView
-    private lateinit var floatText: TextView
-    private lateinit var vibrateText: TextView
+    private lateinit var fpsRow: LinearLayout
+    private lateinit var dedupRow: LinearLayout
+    private lateinit var enhanceRow: LinearLayout
+    private lateinit var scaleRow: LinearLayout
+    private lateinit var floatRow: LinearLayout
+    private lateinit var vibrateRow: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,61 +27,59 @@ class SettingsActivity : AppCompatActivity() {
 
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
+            setPadding(32, 32, 32, 32)
+            setBackgroundColor(Color.parseColor("#1a1a2e"))
         }
+
+        // 标题
+        val titleView = TextView(this).apply {
+            text = "扫码设置"
+            textSize = 24f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 32)
+        }
+        layout.addView(titleView)
 
         // 识别频率
-        val fpsBtn = Button(this).apply {
-            setOnClickListener { showFpsDialog() }
-        }
-        layout.addView(fpsBtn)
-        fpsText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(fpsText)
+        fpsRow = createRow("识别频率", "1 / 2 / 5 / 7.5 / 10 帧每秒")
+        fpsRow.setOnClickListener { showFpsDialog() }
+        layout.addView(fpsRow)
 
         // 去重窗口
-        val dedupBtn = Button(this).apply {
-            text = "去重窗口"
-            setOnClickListener { showDedupDialog() }
-        }
-        layout.addView(dedupBtn)
-        dedupText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(dedupText)
+        dedupRow = createRow("去重窗口", "3 / 5 / 10 秒")
+        dedupRow.setOnClickListener { showDedupDialog() }
+        layout.addView(dedupRow)
 
         // 识别增强
-        val enhanceBtn = Button(this).apply {
-            text = "识别增强"
-            setOnClickListener { showEnhanceDialog() }
-        }
-        layout.addView(enhanceBtn)
-        enhanceText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(enhanceText)
+        enhanceRow = createRow("识别增强", "关闭 / 标准 / 增强")
+        enhanceRow.setOnClickListener { showEnhanceDialog() }
+        layout.addView(enhanceRow)
 
         // 分析精度
-        val scaleBtn = Button(this).apply {
-            text = "分析精度"
-            setOnClickListener { showScaleDialog() }
-        }
-        layout.addView(scaleBtn)
-        scaleText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(scaleText)
+        scaleRow = createRow("分析精度", "原生 / 3200 / 2400 / 1500 / 1200 / 1080 / 800 px")
+        scaleRow.setOnClickListener { showScaleDialog() }
+        layout.addView(scaleRow)
 
         // 悬浮窗
-        val floatBtn = Button(this).apply {
-            text = "悬浮窗"
-            setOnClickListener { toggleFloat() }
-        }
-        layout.addView(floatBtn)
-        floatText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(floatText)
+        floatRow = createRow("悬浮窗", "开 / 关")
+        floatRow.setOnClickListener { toggleFloat() }
+        layout.addView(floatRow)
 
         // 震动
-        val vibrateBtn = Button(this).apply {
-            text = "震动反馈"
-            setOnClickListener { toggleVibrate() }
+        vibrateRow = createRow("震动反馈", "开 / 关")
+        vibrateRow.setOnClickListener { toggleVibrate() }
+        layout.addView(vibrateRow)
+
+        // 音效说明
+        val soundHint = TextView(this).apply {
+            text = "提示：扫到二维码时自动播放音效 + 震动"
+            textSize = 12f
+            setTextColor(Color.parseColor("#888888"))
+            gravity = Gravity.CENTER
+            setPadding(0, 32, 0, 0)
         }
-        layout.addView(vibrateBtn)
-        vibrateText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(vibrateText)
+        layout.addView(soundHint)
 
         val scroll = ScrollView(this)
         scroll.addView(layout)
@@ -87,34 +88,88 @@ class SettingsActivity : AppCompatActivity() {
         refreshTexts()
     }
 
+    private fun createRow(title: String, desc: String): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 24, 24, 24)
+            setBackgroundColor(Color.parseColor("#16213e"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 8, 0, 8)
+            }
+        }
+
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 18f
+            setTextColor(Color.WHITE)
+        }
+        row.addView(titleView)
+
+        val descView = TextView(this).apply {
+            id = View.generateViewId()
+            text = desc
+            textSize = 14f
+            setTextColor(Color.parseColor("#00d9ff"))
+            setPadding(0, 8, 0, 0)
+        }
+        row.addView(descView)
+
+        return row
+    }
+
     private fun refreshTexts() {
         val fps = SettingsManager.getFps(this)
-        fpsText.text = "识别频率：$fps 帧/秒"
+        val fpsDesc = when (fps) {
+            SettingsManager.FPS_1 -> "1 帧/秒（1000ms）"
+            SettingsManager.FPS_2 -> "2 帧/秒（500ms）"
+            SettingsManager.FPS_5 -> "5 帧/秒（200ms）"
+            SettingsManager.FPS_7_5 -> "7.5 帧/秒（133ms）"
+            SettingsManager.FPS_10 -> "10 帧/秒（100ms）"
+            else -> "$fps 帧/秒"
+        }
+        (fpsRow.getChildAt(1) as TextView).text = fpsDesc
 
         val dedup = SettingsManager.getDedup(this)
-        dedupText.text = "去重窗口：$dedup 秒"
+        (dedupRow.getChildAt(1) as TextView).text = "$dedup 秒（同一内容$dedup秒内不重复）"
 
         val enhance = SettingsManager.getEnhance(this)
-        enhanceText.text = "识别增强：" + when (enhance) {
-            SettingsManager.ENHANCE_OFF -> "关闭"
-            SettingsManager.ENHANCE_STD -> "标准"
-            SettingsManager.ENHANCE_STRONG -> "增强"
+        val enhanceDesc = when (enhance) {
+            SettingsManager.ENHANCE_OFF -> "关闭（失败时不增强）"
+            SettingsManager.ENHANCE_STD -> "标准（对比度增强）"
+            SettingsManager.ENHANCE_STRONG -> "增强（锐化+对比度）"
             else -> "未知"
         }
+        (enhanceRow.getChildAt(1) as TextView).text = enhanceDesc
 
         val scale = SettingsManager.getScale(this)
-        scaleText.text = "分析精度：" + when (scale) {
-            SettingsManager.SCALE_NATIVE -> "原生分辨率"
+        val scaleDesc = when (scale) {
+            SettingsManager.SCALE_NATIVE -> "原生分辨率（不缩放，小码必看）"
             else -> "${scale}px 宽"
         }
+        (scaleRow.getChildAt(1) as TextView).text = scaleDesc
 
-        floatText.text = "悬浮窗：" + if (SettingsManager.getFloat(this)) "开" else "关"
-        vibrateText.text = "震动反馈：" + if (SettingsManager.getVibrate(this)) "开" else "关"
+        (floatRow.getChildAt(1) as TextView).text = if (SettingsManager.getFloat(this)) "已开启" else "已关闭"
+        (vibrateRow.getChildAt(1) as TextView).text = if (SettingsManager.getVibrate(this)) "已开启" else "已关闭"
     }
 
     private fun showFpsDialog() {
-        val items = arrayOf("1 帧/秒（1000ms）", "2 帧/秒（500ms）", "5 帧/秒（200ms）", "10 帧/秒（100ms）")
-        val values = intArrayOf(SettingsManager.FPS_1, SettingsManager.FPS_2, SettingsManager.FPS_5, SettingsManager.FPS_10)
+        val items = arrayOf(
+            "1 帧/秒（1000ms）",
+            "2 帧/秒（500ms）",
+            "5 帧/秒（200ms）",
+            "7.5 帧/秒（133ms）",
+            "10 帧/秒（100ms）"
+        )
+        val values = intArrayOf(
+            SettingsManager.FPS_1,
+            SettingsManager.FPS_2,
+            SettingsManager.FPS_5,
+            SettingsManager.FPS_7_5,
+            SettingsManager.FPS_10
+        )
         val current = SettingsManager.getFps(this)
         var checked = values.indexOf(current)
         if (checked < 0) checked = 2
