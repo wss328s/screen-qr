@@ -3,6 +3,7 @@ package com.example.screenqr
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.media.AudioAttributes
 import android.media.SoundPool
@@ -66,6 +67,9 @@ object FloatingResultManager {
                 update(ctx)
             }
 
+            // 应用样式
+            applyStyle(ctx, view)
+
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -91,8 +95,41 @@ object FloatingResultManager {
             } catch (e: Exception) {
             }
         } else {
+            currentView?.let { applyStyle(ctx, it) }
             currentView?.findViewById<TextView>(R.id.qrContent)?.text = text
         }
+    }
+
+    // 应用悬浮窗样式
+    private fun applyStyle(ctx: Context, view: View) {
+        val style = SettingsManager.getFloatStyle(ctx)
+        val alpha = SettingsManager.getFloatAlpha(ctx)
+        val root = view.findViewById<LinearLayout>(R.id.floatRoot)
+        val content = view.findViewById<TextView>(R.id.qrContent)
+
+        // 背景色和文字颜色
+        val (bgColor, textColor) = when (style) {
+            SettingsManager.FLOAT_STYLE_DARK -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_LIGHT -> 0xCCFFFFFF.toInt() to 0xFF000000.toInt()
+            SettingsManager.FLOAT_STYLE_CLEAR -> 0x33000000 to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_PURPLE -> 0xCC6200EE.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_BLUE -> 0xCC018786.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_ORANGE -> 0xCCFF6D00.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_GREEN -> 0xCC2E7D32.toInt() to 0xFFFFFFFF.toInt()
+            else -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
+        }
+
+        // 应用透明度（调整alpha通道）
+        val alphaFactor = alpha / 100f
+        val finalBg = adjustAlpha(bgColor, alphaFactor)
+
+        root.setBackgroundColor(finalBg)
+        content.setTextColor(textColor)
+    }
+
+    private fun adjustAlpha(color: Int, factor: Float): Int {
+        val a = (Color.alpha(color) * factor).toInt().coerceIn(0, 255)
+        return (a shl 24) or (color and 0x00FFFFFF)
     }
 
     fun notifyRead(ctx: Context) {

@@ -51,6 +51,21 @@ object SettingsManager {
     const val KEY_VIBRATE = "vibrate"
     const val DEFAULT_VIBRATE = true
 
+    // 悬浮窗透明度（0-100）
+    const val KEY_FLOAT_ALPHA = "float_alpha"
+    const val DEFAULT_FLOAT_ALPHA = 100
+
+    // 悬浮窗样式
+    const val KEY_FLOAT_STYLE = "float_style"
+    const val FLOAT_STYLE_DARK = 0       // 深色
+    const val FLOAT_STYLE_LIGHT = 1      // 浅色
+    const val FLOAT_STYLE_CLEAR = 2      // 透明
+    const val FLOAT_STYLE_PURPLE = 3     // 紫色渐变
+    const val FLOAT_STYLE_BLUE = 4       // 蓝色科技
+    const val FLOAT_STYLE_ORANGE = 5     // 橙色活力
+    const val FLOAT_STYLE_GREEN = 6      // 绿色护眼
+    const val DEFAULT_FLOAT_STYLE = FLOAT_STYLE_DARK
+
     private fun prefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -71,6 +86,12 @@ object SettingsManager {
 
     fun getVibrate(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_VIBRATE, DEFAULT_VIBRATE)
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()
+
+    fun getFloatAlpha(ctx: Context): Int = prefs(ctx).getInt(KEY_FLOAT_ALPHA, DEFAULT_FLOAT_ALPHA)
+    fun setFloatAlpha(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FLOAT_ALPHA, v).apply()
+
+    fun getFloatStyle(ctx: Context): Int = prefs(ctx).getInt(KEY_FLOAT_STYLE, DEFAULT_FLOAT_STYLE)
+    fun setFloatStyle(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FLOAT_STYLE, v).apply()
 
     // 工具方法：帧/秒 -> 间隔ms
     fun fpsToIntervalMs(fps: Int): Long = when (fps) {

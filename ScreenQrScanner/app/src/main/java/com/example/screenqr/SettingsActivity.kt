@@ -1,7 +1,13 @@
 package com.example.screenqr
 
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
+import android.util.DisplayMetrics
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.card.MaterialCardView
@@ -9,32 +15,66 @@ import com.google.android.material.materialswitch.MaterialSwitch
 
 class SettingsActivity : AppCompatActivity() {
 
+    private lateinit var overlayPermValue: TextView
     private lateinit var fpsValue: TextView
     private lateinit var dedupValue: TextView
     private lateinit var enhanceValue: TextView
     private lateinit var scaleValue: TextView
     private lateinit var floatValue: TextView
+    private lateinit var floatStyleValue: TextView
+    private lateinit var floatAlphaValue: TextView
     private lateinit var vibrateValue: TextView
     private lateinit var floatSwitch: MaterialSwitch
     private lateinit var vibrateSwitch: MaterialSwitch
+    private lateinit var deviceInfo: TextView
+
+    companion object {
+        private const val REQ_OVERLAY = 2001
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
+        overlayPermValue = findViewById(R.id.overlayPermValue)
         fpsValue = findViewById(R.id.fpsValue)
         dedupValue = findViewById(R.id.dedupValue)
         enhanceValue = findViewById(R.id.enhanceValue)
         scaleValue = findViewById(R.id.scaleValue)
         floatValue = findViewById(R.id.floatValue)
+        floatStyleValue = findViewById(R.id.floatStyleValue)
+        floatAlphaValue = findViewById(R.id.floatAlphaValue)
         vibrateValue = findViewById(R.id.vibrateValue)
         floatSwitch = findViewById(R.id.floatSwitch)
         vibrateSwitch = findViewById(R.id.vibrateSwitch)
+        deviceInfo = findViewById(R.id.deviceInfo)
+
+        // 悬浮窗权限申请
+        findViewById<MaterialCardView>(R.id.overlayPermCard).setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                )
+            }
+        }
 
         findViewById<MaterialCardView>(R.id.fpsCard).setOnClickListener { showFpsDialog() }
         findViewById<MaterialCardView>(R.id.dedupCard).setOnClickListener { showDedupDialog() }
         findViewById<MaterialCardView>(R.id.enhanceCard).setOnClickListener { showEnhanceDialog() }
         findViewById<MaterialCardView>(R.id.scaleCard).setOnClickListener { showScaleDialog() }
+        findViewById<MaterialCardView>(R.id.floatStyleCard).setOnClickListener { showFloatStyleDialog() }
+
+        // 透明度滑块
+        val alphaSeek = findViewById<SeekBar>(R.id.floatAlphaSeek)
+        alphaSeek.progress = SettingsManager.getFloatAlpha(this)
+        alphaSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                SettingsManager.setFloatAlpha(this@SettingsActivity, progress)
+                floatAlphaValue.text = "$progress%"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
 
         floatSwitch.setOnCheckedChangeListener { _, checked ->
             SettingsManager.setFloat(this, checked)
@@ -49,7 +89,16 @@ class SettingsActivity : AppCompatActivity() {
         refreshTexts()
     }
 
+    override fun onResume() {
+        super.onResume()
+        refreshTexts()
+    }
+
     private fun refreshTexts() {
+        // 悬浮窗权限状态
+        overlayPermValue.text = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
+
+        // 频率
         val fps = SettingsManager.getFps(this)
         fpsValue.text = when (fps) {
             SettingsManager.FPS_1 -> "1 帧/秒（1000ms）"
@@ -60,9 +109,11 @@ class SettingsActivity : AppCompatActivity() {
             else -> "$fps 帧/秒"
         }
 
+        // 去重
         val dedup = SettingsManager.getDedup(this)
         dedupValue.text = "$dedup 秒"
 
+        // 增强
         val enhance = SettingsManager.getEnhance(this)
         enhanceValue.text = when (enhance) {
             SettingsManager.ENHANCE_OFF -> "关闭"
@@ -71,19 +122,62 @@ class SettingsActivity : AppCompatActivity() {
             else -> "未知"
         }
 
+        // 精度
         val scale = SettingsManager.getScale(this)
         scaleValue.text = when (scale) {
             SettingsManager.SCALE_NATIVE -> "原生分辨率（不缩放）"
             else -> "${scale}px 宽"
         }
 
+        // 悬浮窗
         val floatOn = SettingsManager.getFloat(this)
         floatSwitch.isChecked = floatOn
         floatValue.text = if (floatOn) "已开启" else "已关闭"
 
+        // 样式
+        val style = SettingsManager.getFloatStyle(this)
+        floatStyleValue.text = when (style) {
+            SettingsManager.FLOAT_STYLE_DARK -> "深色"
+            SettingsManager.FLOAT_STYLE_LIGHT -> "浅色"
+            SettingsManager.FLOAT_STYLE_CLEAR -> "透明"
+            SettingsManager.FLOAT_STYLE_PURPLE -> "紫色渐变"
+            SettingsManager.FLOAT_STYLE_BLUE -> "蓝色科技"
+            SettingsManager.FLOAT_STYLE_ORANGE -> "橙色活力"
+            SettingsManager.FLOAT_STYLE_GREEN -> "绿色护眼"
+            else -> "未知"
+        }
+
+        // 透明度
+        val alpha = SettingsManager.getFloatAlpha(this)
+        floatAlphaValue.text = "$alpha%"
+
+        // 震动
         val vibrateOn = SettingsManager.getVibrate(this)
         vibrateSwitch.isChecked = vibrateOn
         vibrateValue.text = if (vibrateOn) "已开启" else "已关闭"
+
+        // 设备信息
+        deviceInfo.text = buildDeviceInfo()
+    }
+
+    private fun buildDeviceInfo(): String {
+        val wm = getSystemService(WINDOW_SERVICE) as android.view.WindowManager
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(metrics)
+        val screenW = metrics.widthPixels
+        val screenH = metrics.heightPixels
+        val density = metrics.density
+        val densityDpi = metrics.densityDpi
+
+        return buildString {
+            append("设备型号：${Build.MANUFACTURER} ${Build.MODEL}\n")
+            append("Android版本：${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
+            append("屏幕分辨率：${screenW} × ${screenH}\n")
+            append("屏幕密度：${density}x (${densityDpi}dpi)\n")
+            append("处理器：${Build.HARDWARE}\n")
+            append("系统版本：${Build.DISPLAY}")
+        }
     }
 
     private fun showFpsDialog() {
@@ -159,6 +253,33 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle("分析精度（小码必看）")
             .setSingleChoiceItems(items, checked) { dialog, which ->
                 SettingsManager.setScale(this, values[which])
+                dialog.dismiss()
+                refreshTexts()
+            }
+            .show()
+    }
+
+    private fun showFloatStyleDialog() {
+        val items = arrayOf(
+            "深色", "浅色", "透明",
+            "紫色渐变", "蓝色科技", "橙色活力", "绿色护眼"
+        )
+        val values = intArrayOf(
+            SettingsManager.FLOAT_STYLE_DARK,
+            SettingsManager.FLOAT_STYLE_LIGHT,
+            SettingsManager.FLOAT_STYLE_CLEAR,
+            SettingsManager.FLOAT_STYLE_PURPLE,
+            SettingsManager.FLOAT_STYLE_BLUE,
+            SettingsManager.FLOAT_STYLE_ORANGE,
+            SettingsManager.FLOAT_STYLE_GREEN
+        )
+        var checked = values.indexOf(SettingsManager.getFloatStyle(this))
+        if (checked < 0) checked = 0
+
+        AlertDialog.Builder(this)
+            .setTitle("悬浮窗样式")
+            .setSingleChoiceItems(items, checked) { dialog, which ->
+                SettingsManager.setFloatStyle(this, values[which])
                 dialog.dismiss()
                 refreshTexts()
             }
