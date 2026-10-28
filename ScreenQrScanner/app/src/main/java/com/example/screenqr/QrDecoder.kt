@@ -35,29 +35,32 @@ object QrDecoder {
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
+        // 1. 正常识别（最常见）
         var result = tryDecode(w, h, pixels, false)
         if (result != null) return result
 
+        // 2. 反色识别（白码黑底）
         result = tryDecode(w, h, pixels, true)
         if (result != null) return result
 
+        // 3. 增强模式（小码/虚焦）
+        if (enhanceMode != SettingsManager.ENHANCE_OFF) {
+            // 标准：对比度增强
+            result = tryDecodeEnhanced(w, h, pixels, strong = false)
+            if (result != null) return result
+
+            // 增强：锐化+对比度
+            if (enhanceMode == SettingsManager.ENHANCE_STRONG) {
+                result = tryDecodeEnhanced(w, h, pixels, strong = true)
+                if (result != null) return result
+            }
+        }
+
+        // 4. 旋转识别（最后，因为慢）
         result = tryDecodeRotated(w, h, pixels, 90)
         if (result != null) return result
 
         result = tryDecodeRotated(w, h, pixels, 180)
-        if (result != null) return result
-
-        // 根据增强模式决定是否做增强
-        if (enhanceMode == SettingsManager.ENHANCE_OFF) return null
-
-        // 标准：对比度增强
-        result = tryDecodeEnhanced(w, h, pixels, strong = false)
-        if (result != null) return result
-
-        // 增强：锐化+对比度
-        if (enhanceMode == SettingsManager.ENHANCE_STRONG) {
-            result = tryDecodeEnhanced(w, h, pixels, strong = true)
-        }
         return result
     }
 

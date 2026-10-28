@@ -4,7 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.PixelFormat
-import android.media.MediaPlayer
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -22,9 +23,23 @@ import android.widget.Toast
 object FloatingResultManager {
 
     private var currentView: View? = null
+    private var soundPool: SoundPool? = null
+    private var beepId: Int = 0
+
+    private fun initSound(ctx: Context) {
+        if (soundPool != null) return
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder()
+            .setMaxStreams(2)
+            .setAudioAttributes(attrs)
+            .build()
+        beepId = soundPool?.load(ctx, R.raw.beep, 1) ?: 0
+    }
 
     fun update(ctx: Context) {
-        // 悬浮窗开关关了，不显示
         if (!SettingsManager.getFloat(ctx)) {
             hideAll(ctx)
             return
@@ -87,9 +102,12 @@ object FloatingResultManager {
             }
         }
 
-        // 播放音效
+        // 播放音效（SoundPool，更快）
         try {
-            MediaPlayer.create(ctx, R.raw.beep)?.start()
+            initSound(ctx)
+            if (beepId != 0) {
+                soundPool?.play(beepId, 1f, 1f, 1, 0, 1f)
+            }
         } catch (e: Exception) {
         }
     }
