@@ -156,6 +156,8 @@ class QrScanService : Service() {
 
         isRunning = true
         updateStatusNotification()
+        // 预加载音效
+        FloatingResultManager.preloadSound(this)
         handler.postDelayed(scanRunnable, 300)
         handler.postDelayed(statusUpdateRunnable, 1000)
     }

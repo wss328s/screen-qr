@@ -39,6 +39,11 @@ object FloatingResultManager {
         beepId = soundPool?.load(ctx, R.raw.beep, 1) ?: 0
     }
 
+    // 预加载音效（服务启动时调用）
+    fun preloadSound(ctx: Context) {
+        try { initSound(ctx) } catch (e: Exception) {}
+    }
+
     fun update(ctx: Context) {
         if (!SettingsManager.getFloat(ctx)) {
             hideAll(ctx)
