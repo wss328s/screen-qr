@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.PixelFormat
+import android.media.MediaPlayer
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -75,15 +76,21 @@ object FloatingResultManager {
     }
 
     fun notifyRead(ctx: Context) {
-        // 震动开关关了，不震动
-        if (!SettingsManager.getVibrate(ctx)) return
+        // 震动
+        if (SettingsManager.getVibrate(ctx)) {
+            val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                v.vibrate(80)
+            }
+        }
 
-        val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(80)
+        // 播放音效
+        try {
+            MediaPlayer.create(ctx, R.raw.beep)?.start()
+        } catch (e: Exception) {
         }
     }
 
