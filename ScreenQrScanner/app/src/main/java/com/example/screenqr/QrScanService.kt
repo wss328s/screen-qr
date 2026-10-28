@@ -52,6 +52,8 @@ class QrScanService : Service() {
     private var imageReader: ImageReader? = null
     private val handler = Handler(Looper.getMainLooper())
     private val recent = LinkedHashMap<String, Long>()
+    // 比赛模式反馈窗口（记录永久去重，但反馈按时间窗口）
+    private val gameFeedback = LinkedHashMap<String, Long>()
 
     private var screenW = 0
     private var screenH = 0
@@ -61,6 +63,7 @@ class QrScanService : Service() {
     private var frameCount = 0
     private var qrCount = 0
     private var startTimestamp = 0L
+    private var lastSuspectCheck = 0L
 
     private val scanRunnable = object : Runnable {
         override fun run() {
@@ -157,6 +160,8 @@ class QrScanService : Service() {
         } else {
             ScanHistory.reset()
         }
+        gameFeedback.clear()
+        recent.clear()
         FloatingResultManager.update(this)
 
         isRunning = true
@@ -200,16 +205,34 @@ class QrScanService : Service() {
             val scaledW = scaled.width
             val scaledH = scaled.height
             val result = QrDecoder.decode(scaled, enhanceMode)
+
+            // 疑似检测（节流，每400ms一次），失败时提示
+            if (result == null && enhanceMode != SettingsManager.ENHANCE_OFF) {
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastSuspectCheck > 400) {
+                    lastSuspectCheck = nowMs
+                    if (QrDecoder.detectSuspect(scaled)) {
+                        FloatingResultManager.markSuspect()
+                        FloatingResultManager.update(this)
+                    }
+                }
+            }
+
             scaled.recycle()
 
             if (result != null) {
                 if (workMode == SettingsManager.MODE_GAME) {
-                    // 比赛导航模式
+                    // 比赛导航模式：记录永久去重，反馈按时间窗口
                     val isNew = GameState.parseAndRecord(result.text)
+                    val shouldNotify = shouldGameFeedback(result.text, dedupTtlMs)
+
                     if (isNew) {
                         qrCount++
                         found = true
                         FloatingResultManager.update(this)
+                    }
+
+                    if (shouldNotify) {
                         FloatingResultManager.notifyRead(this)
                     }
                 } else {
@@ -233,6 +256,15 @@ class QrScanService : Service() {
             try { image.close() } catch (_: Exception) {}
         }
         return found
+    }
+
+    // 比赛模式反馈：时间窗口内同一码只反馈一次（记录仍永久去重）
+    private fun shouldGameFeedback(content: String, ttlMs: Long): Boolean {
+        val now = System.currentTimeMillis()
+        gameFeedback.entries.removeIf { now - it.value > ttlMs }
+        if (gameFeedback.containsKey(content)) return false
+        gameFeedback[content] = now
+        return true
     }
 
     private fun isDuplicate(content: String): Boolean {
