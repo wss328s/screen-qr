@@ -61,7 +61,6 @@ class QrScanService : Service() {
     private var frameCount = 0
     private var qrCount = 0
     private var startTimestamp = 0L
-    private var lastSuspectCheck = 0L
 
     private val scanRunnable = object : Runnable {
         override fun run() {
@@ -202,18 +201,6 @@ class QrScanService : Service() {
             val scaledW = scaled.width
             val scaledH = scaled.height
             val result = QrDecoder.decode(scaled, enhanceMode)
-
-            // 疑似检测（节流，每400ms一次），失败时提示
-            if (result == null && enhanceMode != SettingsManager.ENHANCE_OFF) {
-                val nowMs = System.currentTimeMillis()
-                if (nowMs - lastSuspectCheck > 400) {
-                    lastSuspectCheck = nowMs
-                    if (QrDecoder.detectSuspect(scaled)) {
-                        FloatingResultManager.markSuspect()
-                        FloatingResultManager.update(this)
-                    }
-                }
-            }
 
             scaled.recycle()
 

@@ -20,18 +20,13 @@ import android.widget.TextView
 import android.widget.Toast
 
 /**
- * 常驻悬浮窗：显示扫码内容列表。
+ * 常驻悬浮窗：显示扫码内容列表（简洁版：复制 / 重置）。
  */
 object FloatingResultManager {
 
     private var currentView: View? = null
     private var soundPool: SoundPool? = null
     private var beepId: Int = 0
-
-    // 疑似码状态（短时间内有效）
-    @Volatile private var suspectedAt: Long = 0
-    fun markSuspect() { suspectedAt = System.currentTimeMillis() }
-    private fun isSuspected(): Boolean = System.currentTimeMillis() - suspectedAt < 1500
 
     private fun initSound(ctx: Context) {
         if (soundPool != null) return
@@ -58,27 +53,23 @@ object FloatingResultManager {
         }
 
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val text = currentListText(ctx)
 
         if (currentView == null) {
             val view = LayoutInflater.from(ctx).inflate(R.layout.floating_result, null)
+            view.findViewById<TextView>(R.id.qrContent).text = text
 
-            // 清除按钮
-            view.findViewById<TextView>(R.id.clearBtn).setOnClickListener {
+            view.findViewById<Button>(R.id.copyBtn).setOnClickListener {
+                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("scan", currentFullSummary(ctx)))
+                Toast.makeText(ctx, "已复制全部内容", Toast.LENGTH_SHORT).show()
+            }
+            view.findViewById<Button>(R.id.closeBtn).setOnClickListener {
                 currentReset(ctx)
                 update(ctx)
             }
 
-            // 长按内容区复制全部
-            val content = view.findViewById<TextView>(R.id.qrContent)
-            content.setOnLongClickListener {
-                val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("scan", currentFullSummary(ctx)))
-                Toast.makeText(ctx, "已复制全部内容", Toast.LENGTH_SHORT).show()
-                true
-            }
-
             applyStyle(ctx, view)
-            fillContent(ctx, view)
 
             val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -105,51 +96,10 @@ object FloatingResultManager {
             } catch (e: Exception) {
             }
         } else {
-            currentView?.let {
-                applyStyle(ctx, it)
-                fillContent(ctx, it)
-            }
+            currentView?.let { applyStyle(ctx, it) }
+            currentView?.findViewById<TextView>(R.id.qrContent)?.text = text
         }
     }
-
-    // 填充状态、提示、列表
-    private fun fillContent(ctx: Context, view: View) {
-        val count = currentCount(ctx)
-        val suspect = isSuspected()
-        val dot = view.findViewById<View>(R.id.statusDot)
-        val statusText = view.findViewById<TextView>(R.id.statusText)
-        val hint = view.findViewById<TextView>(R.id.hintText)
-        val content = view.findViewById<TextView>(R.id.qrContent)
-
-        if (suspect) {
-            // 疑似码未解析（橙色）
-            dot.setBackgroundColor(0xFFFFA726.toInt())
-            statusText.setTextColor(0xFFFFA726.toInt())
-            statusText.text = "疑似码未解析"
-            hint.text = "可调整距离/角度后重试"
-        } else if (count == 0) {
-            // 等待（绿色）
-            dot.setBackgroundColor(0xFF4CAF50.toInt())
-            statusText.setTextColor(0xFF4CAF50.toInt())
-            statusText.text = "监听中 · 等待二维码"
-            hint.text = "扫描中，请将二维码放入画面"
-        } else {
-            // 已记录（绿色）
-            dot.setBackgroundColor(0xFF4CAF50.toInt())
-            statusText.setTextColor(0xFF4CAF50.toInt())
-            statusText.text = "已记录 $count 个"
-            hint.text = "扫描中，请将二维码放入画面"
-        }
-
-        content.text = currentListText(ctx)
-    }
-
-    // 根据模式获取数量
-    private fun currentCount(ctx: Context): Int =
-        if (SettingsManager.getMode(ctx) == SettingsManager.MODE_GAME)
-            GameState.totalRead
-        else
-            ScanHistory.count
 
     // 根据模式获取列表文本
     private fun currentListText(ctx: Context): String =
@@ -167,45 +117,35 @@ object FloatingResultManager {
 
     // 根据模式重置
     private fun currentReset(ctx: Context) {
-        suspectedAt = 0L
         if (SettingsManager.getMode(ctx) == SettingsManager.MODE_GAME)
             GameState.reset()
         else
             ScanHistory.reset()
     }
 
-    // 应用悬浮窗样式（GradientDrawable，保持圆角）
+    // 应用悬浮窗样式
     private fun applyStyle(ctx: Context, view: View) {
         val style = SettingsManager.getFloatStyle(ctx)
         val alpha = SettingsManager.getFloatAlpha(ctx)
         val root = view.findViewById<LinearLayout>(R.id.floatRoot)
         val content = view.findViewById<TextView>(R.id.qrContent)
-        val hint = view.findViewById<TextView>(R.id.hintText)
 
-        val bgColor = when (style) {
-            SettingsManager.FLOAT_STYLE_DARK -> 0xE61F2937.toInt()
-            SettingsManager.FLOAT_STYLE_LIGHT -> 0xE6FFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_CLEAR -> 0x401F2937
-            SettingsManager.FLOAT_STYLE_PURPLE -> 0xE66200EE.toInt()
-            SettingsManager.FLOAT_STYLE_BLUE -> 0xE60E7490.toInt()
-            SettingsManager.FLOAT_STYLE_ORANGE -> 0xE6EA580C.toInt()
-            SettingsManager.FLOAT_STYLE_GREEN -> 0xE6166534.toInt()
-            else -> 0xE61F2937.toInt()
+        val (bgColor, textColor) = when (style) {
+            SettingsManager.FLOAT_STYLE_DARK -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_LIGHT -> 0xCCFFFFFF.toInt() to 0xFF000000.toInt()
+            SettingsManager.FLOAT_STYLE_CLEAR -> 0x33000000 to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_PURPLE -> 0xCC6200EE.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_BLUE -> 0xCC018786.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_ORANGE -> 0xCCFF6D00.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_GREEN -> 0xCC2E7D32.toInt() to 0xFFFFFFFF.toInt()
+            else -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
         }
 
-        val isLight = style == SettingsManager.FLOAT_STYLE_LIGHT
         val alphaFactor = alpha / 100f
         val finalBg = adjustAlpha(bgColor, alphaFactor)
 
-        val gd = android.graphics.drawable.GradientDrawable()
-        gd.cornerRadius = 28f * ctx.resources.displayMetrics.density
-        gd.setColor(finalBg)
-        root.background = gd
-
-        val mainText = if (isLight) 0xFF111111.toInt() else 0xFFFFFFFF.toInt()
-        val subText = if (isLight) 0xFF444444.toInt() else 0xFFD1D5DB.toInt()
-        hint.setTextColor(mainText)
-        content.setTextColor(subText)
+        root.setBackgroundColor(finalBg)
+        content.setTextColor(textColor)
     }
 
     private fun adjustAlpha(color: Int, factor: Float): Int {
@@ -225,7 +165,7 @@ object FloatingResultManager {
             }
         }
 
-        // 播放音效（SoundPool，更快）
+        // 播放音效（受音效开关控制）
         if (SettingsManager.getSound(ctx)) {
             try {
                 initSound(ctx)
