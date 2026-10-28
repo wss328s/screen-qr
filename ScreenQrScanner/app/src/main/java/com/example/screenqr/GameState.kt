@@ -6,7 +6,6 @@ package com.example.screenqr
  * - 满3个自动跳到下一组
  */
 object GameState {
-
     data class Leg(
         val codes: MutableList<Int> = mutableListOf()
     ) {
@@ -26,7 +25,6 @@ object GameState {
         private set
     var totalRead = 0
         private set
-
     private val recentCodes = LinkedHashMap<String, Long>()
     private val dedupTtl = 5000L
 
@@ -47,7 +45,6 @@ object GameState {
         if (recentCodes.containsKey(s)) return false
 
         if (currentLegIndex >= 3 && legs[3].isComplete) return false
-
         val leg = legs[currentLegIndex]
         if (leg.codes.size >= 3) return false
 
@@ -66,11 +63,9 @@ object GameState {
         val leg = legs[currentLegIndex]
         val sb = StringBuilder()
         sb.append("岔路$legNum/4 · 已读$totalRead/12\n")
-
         val parts = leg.codes.mapIndexed { i, v -> "码${i+1}:$v" }
         val display = parts.ifEmpty { listOf("码1:?","码2:?","码3:?") }
         sb.append(display.joinToString("  "))
-
         for (i in 0..3) {
             val l = legs[i]
             if (l.isComplete) {

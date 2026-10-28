@@ -9,6 +9,12 @@ object SettingsManager {
 
     private const val PREFS = "qr_settings"
 
+    // 工作模式
+    const val KEY_MODE = "mode"
+    const val MODE_SCAN = 0    // 纯扫码
+    const val MODE_GAME = 1    // 比赛导航
+    const val DEFAULT_MODE = MODE_SCAN
+
     // 识别频率（帧/秒）
     const val KEY_FPS = "fps"
     const val FPS_1 = 1   // 1000ms
@@ -72,6 +78,9 @@ object SettingsManager {
 
     private fun prefs(ctx: Context) =
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun getMode(ctx: Context): Int = prefs(ctx).getInt(KEY_MODE, DEFAULT_MODE)
+    fun setMode(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_MODE, v).apply()
 
     fun getFps(ctx: Context): Int = prefs(ctx).getInt(KEY_FPS, DEFAULT_FPS)
     fun setFps(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FPS, v).apply()

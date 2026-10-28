@@ -16,6 +16,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 class SettingsActivity : AppCompatActivity() {
 
     private lateinit var overlayPermValue: TextView
+    private lateinit var modeValue: TextView
     private lateinit var fpsValue: TextView
     private lateinit var dedupValue: TextView
     private lateinit var enhanceValue: TextView
@@ -39,6 +40,7 @@ class SettingsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_settings)
 
         overlayPermValue = findViewById(R.id.overlayPermValue)
+        modeValue = findViewById(R.id.modeValue)
         fpsValue = findViewById(R.id.fpsValue)
         dedupValue = findViewById(R.id.dedupValue)
         enhanceValue = findViewById(R.id.enhanceValue)
@@ -62,6 +64,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        findViewById<MaterialCardView>(R.id.modeCard).setOnClickListener { showModeDialog() }
         findViewById<MaterialCardView>(R.id.fpsCard).setOnClickListener { showFpsDialog() }
         findViewById<MaterialCardView>(R.id.dedupCard).setOnClickListener { showDedupDialog() }
         findViewById<MaterialCardView>(R.id.enhanceCard).setOnClickListener { showEnhanceDialog() }
@@ -106,6 +109,10 @@ class SettingsActivity : AppCompatActivity() {
     private fun refreshTexts() {
         // 悬浮窗权限状态
         overlayPermValue.text = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
+
+        // 模式
+        val mode = SettingsManager.getMode(this)
+        modeValue.text = if (mode == SettingsManager.MODE_GAME) "比赛导航" else "纯扫码"
 
         // 频率
         val fps = SettingsManager.getFps(this)
@@ -192,6 +199,22 @@ class SettingsActivity : AppCompatActivity() {
             append("处理器：${Build.HARDWARE}\n")
             append("系统版本：${Build.DISPLAY}")
         }
+    }
+
+    private fun showModeDialog() {
+        val items = arrayOf("纯扫码", "比赛导航（4岔路×3码比大小）")
+        val values = intArrayOf(SettingsManager.MODE_SCAN, SettingsManager.MODE_GAME)
+        var checked = values.indexOf(SettingsManager.getMode(this))
+        if (checked < 0) checked = 0
+
+        AlertDialog.Builder(this)
+            .setTitle("识别模式")
+            .setSingleChoiceItems(items, checked) { dialog, which ->
+                SettingsManager.setMode(this, values[which])
+                dialog.dismiss()
+                refreshTexts()
+            }
+            .show()
     }
 
     private fun showFpsDialog() {

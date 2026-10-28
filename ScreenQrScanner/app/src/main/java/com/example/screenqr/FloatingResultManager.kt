@@ -53,18 +53,18 @@ object FloatingResultManager {
         }
 
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val text = ScanHistory.statusText()
+        val text = currentStatusText(ctx)
 
         if (currentView == null) {
             val view = LayoutInflater.from(ctx).inflate(R.layout.floating_result, null)
             view.findViewById<TextView>(R.id.qrContent).text = text
             view.findViewById<Button>(R.id.copyBtn).setOnClickListener {
                 val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("scan", ScanHistory.fullSummary()))
+                cm.setPrimaryClip(ClipData.newPlainText("scan", currentFullSummary(ctx)))
                 Toast.makeText(ctx, "已复制全部内容", Toast.LENGTH_SHORT).show()
             }
             view.findViewById<Button>(R.id.closeBtn).setOnClickListener {
-                ScanHistory.reset()
+                currentReset(ctx)
                 update(ctx)
             }
 
@@ -99,6 +99,28 @@ object FloatingResultManager {
             currentView?.let { applyStyle(ctx, it) }
             currentView?.findViewById<TextView>(R.id.qrContent)?.text = text
         }
+    }
+
+    // 根据模式获取状态文本
+    private fun currentStatusText(ctx: Context): String =
+        if (SettingsManager.getMode(ctx) == SettingsManager.MODE_GAME)
+            GameState.statusText()
+        else
+            ScanHistory.statusText()
+
+    // 根据模式获取完整摘要
+    private fun currentFullSummary(ctx: Context): String =
+        if (SettingsManager.getMode(ctx) == SettingsManager.MODE_GAME)
+            GameState.fullSummary()
+        else
+            ScanHistory.fullSummary()
+
+    // 根据模式重置
+    private fun currentReset(ctx: Context) {
+        if (SettingsManager.getMode(ctx) == SettingsManager.MODE_GAME)
+            GameState.reset()
+        else
+            ScanHistory.reset()
     }
 
     // 应用悬浮窗样式

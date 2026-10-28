@@ -41,6 +41,7 @@ class QrScanService : Service() {
     }
 
     // 从设置读取参数
+    private val workMode: Int get() = SettingsManager.getMode(this)
     private val scanIntervalMs: Long get() = SettingsManager.fpsToIntervalMs(SettingsManager.getFps(this))
     private val dedupTtlMs: Long get() = SettingsManager.getDedup(this).toLong() * 1000
     private val scaleWidth: Int get() = SettingsManager.getScale(this)
@@ -150,8 +151,12 @@ class QrScanService : Service() {
             return
         }
 
-        // 重置扫码历史，显示悬浮窗
-        ScanHistory.reset()
+        // 重置，显示悬浮窗（根据模式）
+        if (workMode == SettingsManager.MODE_GAME) {
+            GameState.reset()
+        } else {
+            ScanHistory.reset()
+        }
         FloatingResultManager.update(this)
 
         isRunning = true
@@ -198,22 +203,29 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (result != null) {
-                // 加到历史：同一内容在重置前只保留一次
-                val isNew = ScanHistory.add(result.text)
+                if (workMode == SettingsManager.MODE_GAME) {
+                    // 比赛导航模式
+                    val isNew = GameState.parseAndRecord(result.text)
+                    if (isNew) {
+                        qrCount++
+                        found = true
+                        FloatingResultManager.update(this)
+                        FloatingResultManager.notifyRead(this)
+                    }
+                } else {
+                    // 纯扫码模式
+                    val isNew = ScanHistory.add(result.text)
+                    val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
 
-                // 反馈：按去重窗口判断（音效/震动）
-                val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
+                    if (isNew) {
+                        qrCount++
+                        found = true
+                        FloatingResultManager.update(this)
+                    }
 
-                if (isNew) {
-                    qrCount++
-                    found = true
-                    // 新内容才更新悬浮窗
-                    FloatingResultManager.update(this)
-                }
-
-                if (shouldNotify) {
-                    // 反馈（音效/震动）
-                    FloatingResultManager.notifyRead(this)
+                    if (shouldNotify) {
+                        FloatingResultManager.notifyRead(this)
+                    }
                 }
             }
         } catch (e: Exception) {
