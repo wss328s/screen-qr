@@ -275,7 +275,7 @@
             app:cardBackgroundColor="@color/card_bg"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -304,6 +304,49 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="原生保留每个像素，小码/远距离首选；缩小后更快"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginTop="6dp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 识别区域 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/regionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="识别区域（ROI）"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/regionValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="图传安全区（约77%，推荐）"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:layout_marginTop="6dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="只扫二维码会出现的区域，区域越小像素越少、速度越快"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="6dp"/>

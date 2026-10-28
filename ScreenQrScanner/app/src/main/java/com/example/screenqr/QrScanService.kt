@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -62,7 +61,12 @@ class QrScanService : Service() {
     private val workerThread = HandlerThread("QrScanWorker").apply { start() }
     private val scanHandler = Handler(workerThread.looper)
 
-    private val recent = LinkedHashMap<String, Long>()
+    // 运动触发突发：画面变化后，在该 elapsedRealtime 时间戳前以最快速度扫描（降低新码出现时的延迟）
+    private var burstUntilElapsed = 0L
+    // 上一帧的灰度抽样（用于廉价运动检测）
+    private var lastSample: ByteArray? = null
+    // 上次实际提取/解码的时间（速率门，-1=尚未派发）
+    private var lastDispatchAt = -1L
 
     private var screenW = 0
     private var screenH = 0
@@ -72,16 +76,6 @@ class QrScanService : Service() {
     private var frameCount = 0
     private var qrCount = 0
     private var startTimestamp = 0L
-
-    private val scanRunnable = object : Runnable {
-        override fun run() {
-            val found = scanOnce()
-            // 识别失败也保留一个最小间隔，避免紧密循环占满CPU/内存；
-            // 成功后按设定周期等待
-            val delay = if (found) scanIntervalMs else maxOf(scanIntervalMs, 30L)
-            scanHandler.postDelayed(this, delay)
-        }
-    }
 
     private val statusUpdateRunnable = object : Runnable {
         override fun run() {
@@ -147,7 +141,19 @@ class QrScanService : Service() {
         qrCount = 0
 
         try {
-            imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2)
+            // 事件驱动：一有新帧立即在后台线程处理（静止画面不产生帧，零开销）
+            imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2).apply {
+                setOnImageAvailableListener({ reader ->
+                    val image = try { reader.acquireLatestImage() } catch (e: Exception) { null }
+                    if (image != null) {
+                        try {
+                            handleFrame(image)
+                        } finally {
+                            try { image.close() } catch (_: Exception) {}
+                        }
+                    }
+                }, scanHandler)
+            }
             virtualDisplay = mediaProjection?.createVirtualDisplay(
                 "ScreenQrCapture",
                 screenW, screenH, density,
@@ -175,47 +181,49 @@ class QrScanService : Service() {
         updateStatusNotification()
         // 预加载音效
         FloatingResultManager.preloadSound(this)
-        // 扫描循环在后台线程；状态通知在主线程
-        scanHandler.postDelayed(scanRunnable, 300)
+        // 帧处理由 ImageReader 事件驱动（后台线程）；状态通知在后台线程周期刷新
         mainHandler.postDelayed(statusUpdateRunnable, 1000)
     }
 
-    private fun scanOnce(): Boolean {
-        val reader = imageReader ?: return false
-        val image = try { reader.acquireLatestImage() } catch (e: Exception) { null }
-        image ?: return false
-
+    /** 处理一帧：廉价运动采样 -> 速率门 -> ROI灰度提取 -> 纯色拒绝 -> native解码 */
+    private fun handleFrame(image: android.media.Image) {
         frameCount++
-        var found = false
-
         try {
             val plane = image.planes[0]
-            val buffer = plane.buffer
+            val srcBuffer = plane.buffer
             val pixelStride = plane.pixelStride
-            val rowStride = plane.rowStride
-            val rowPadding = rowStride - pixelStride * screenW
+            val srcRowStride = plane.rowStride
+            val imgW = image.width
+            val imgH = image.height
+            val now = android.os.SystemClock.elapsedRealtime()
 
-            val fullW = screenW + rowPadding / pixelStride
-            val bitmap = Bitmap.createBitmap(fullW, screenH, Bitmap.Config.ARGB_8888)
-            bitmap.copyPixelsFromBuffer(buffer)
+            // 1) 廉价运动采样（256点，直接读原始缓冲），画面变化 -> 突发 1.5 秒
+            if (sampleMotion(srcBuffer, srcRowStride, pixelStride, imgW, imgH)) {
+                burstUntilElapsed = now + 1500L
+            }
 
-            val cropped = if (fullW != screenW) {
-                Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
-            } else bitmap
+            // 2) 有效扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
+            val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
 
-            // 识别目标宽度：NATIVE时也加保护上限，避免2K/4K屏爆内存
-            val targetWidth = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
-            val scaled = if (screenW > targetWidth) {
-                val scaleH = (targetWidth * screenH / screenW.toFloat()).toInt()
-                Bitmap.createScaledBitmap(cropped, targetWidth, scaleH, false).also {
-                    if (it != cropped) cropped.recycle()
-                }
-            } else cropped
+            // 3) 速率门：未到间隔则跳过（运动采样已做，开销极小），避免密集提取/解码
+            if (!shouldDispatch(now, interval)) return
 
-            val scaledW = scaled.width
-            val scaledH = scaled.height
-            val result = QrDecoder.decode(scaled, enhanceMode)
-            scaled.recycle()
+            // 4) ROI 单遍 裁剪 + 降采样 + 转灰度（不建 Bitmap）
+            val bounds = SettingsManager.getRegionBounds(this)
+            val maxDim = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
+            val frame = FrameExtractor.extract(
+                srcBuffer, srcRowStride, pixelStride,
+                imgW, imgH, bounds, maxDim
+            ) ?: return
+
+            // 5) 黑屏/纯色帧解码前拒绝（QR 码本身高对比，不会被误判）
+            if (isFrameFlat(frame.gray, frame.width, frame.height, frame.rowStride)) return
+
+            // 6) native 一次解码（灰度直喂，最快）
+            frame.gray.rewind()
+            val result = QrDecoder.decode(
+                frame.gray, frame.rowStride, frame.width, frame.height, enhanceMode
+            )
 
             if (result != null) {
                 if (workMode == SettingsManager.MODE_GAME) {
@@ -223,7 +231,6 @@ class QrScanService : Service() {
                     val isNew = GameState.parseAndRecord(result.text)
                     if (isNew) {
                         qrCount++
-                        found = true
                         mainHandler.post {
                             FloatingResultManager.update(this)
                             FloatingResultManager.notifyRead(this)
@@ -236,7 +243,6 @@ class QrScanService : Service() {
 
                     if (isNew) {
                         qrCount++
-                        found = true
                         mainHandler.post { FloatingResultManager.update(this) }
                     }
 
@@ -246,18 +252,68 @@ class QrScanService : Service() {
                 }
             }
         } catch (e: Exception) {
-        } finally {
-            try { image.close() } catch (_: Exception) {}
         }
-        return found
     }
 
-    private fun isDuplicate(content: String): Boolean {
-        val now = System.currentTimeMillis()
-        recent.entries.removeIf { now - it.value > dedupTtlMs }
-        if (recent.containsKey(content)) return true
-        recent[content] = now
-        return false
+    /** 速率门：距上次派发不足 interval 则返回 false */
+    private fun shouldDispatch(now: Long, interval: Long): Boolean {
+        if (lastDispatchAt >= 0 && now - lastDispatchAt < interval) return false
+        lastDispatchAt = now
+        return true
+    }
+
+    /**
+     * 廉价运动采样：从原始 RGBA 缓冲抽样 16x16（256点），转灰度后与上一帧对比；
+     * 变化点 > 3% 视为画面有运动。在提取/解码之前完成，开销极小。
+     */
+    private fun sampleMotion(
+        buffer: java.nio.ByteBuffer, rowStride: Int, pixelStride: Int, w: Int, h: Int
+    ): Boolean {
+        val nx = 16; val ny = 16
+        val cur = ByteArray(nx * ny)
+        for (j in 0 until ny) {
+            val y = (j * h / ny).coerceAtMost(h - 1)
+            val rowBase = y * rowStride
+            for (i in 0 until nx) {
+                val x = (i * w / nx).coerceAtMost(w - 1)
+                val idx = rowBase + x * pixelStride
+                val r = buffer.get(idx).toInt() and 0xFF
+                val g = buffer.get(idx + 1).toInt() and 0xFF
+                val b = buffer.get(idx + 2).toInt() and 0xFF
+                // 与 zxing-cpp 核心 RGBToLum 一致
+                cur[j * nx + i] = ((306 * r + 601 * g + 117 * b + 0x200) shr 10).toByte()
+            }
+        }
+        val prev = lastSample
+        val changed = if (prev != null && prev.size == cur.size) {
+            var diff = 0
+            for (i in cur.indices) {
+                if (kotlin.math.abs((cur[i].toInt() and 0xFF) - (prev[i].toInt() and 0xFF)) > 12) diff++
+            }
+            diff.toFloat() / cur.size > 0.03f
+        } else true
+        lastSample = cur
+        return changed
+    }
+
+    /** 纯色/黑屏判断：抽样统计灰度方差，方差极低（接近纯色）返回 true，跳过解码 */
+    private fun isFrameFlat(gray: java.nio.ByteBuffer, w: Int, h: Int, rowStride: Int): Boolean {
+        val step = maxOf(1, (w * h) / 4000)  // 抽样约 4000 点
+        var n = 0; var sum = 0L; var sumSq = 0L
+        var y = 0
+        while (y < h) {
+            var x = 0
+            while (x < w) {
+                val v = gray.get(y * rowStride + x).toInt() and 0xFF
+                sum += v; sumSq += v.toLong() * v; n++
+                x += step
+            }
+            y += step
+        }
+        if (n == 0) return true
+        val mean = sum.toDouble() / n
+        val variance = (sumSq.toDouble() / n) - mean * mean
+        return variance < 25.0
     }
 
     private fun buildNotification(title: String, text: String): Notification {
@@ -293,8 +349,8 @@ class QrScanService : Service() {
 
     override fun onDestroy() {
         isRunning = false
-        scanHandler.removeCallbacks(scanRunnable)
         mainHandler.removeCallbacks(statusUpdateRunnable)
+        try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) {}
         try { virtualDisplay?.release() } catch (_: Exception) {}
         try { imageReader?.close() } catch (_: Exception) {}
         try { mediaProjection?.stop() } catch (_: Exception) {}

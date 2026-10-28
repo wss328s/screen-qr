@@ -21,6 +21,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var dedupValue: TextView
     private lateinit var enhanceValue: TextView
     private lateinit var scaleValue: TextView
+    private lateinit var regionValue: TextView
     private lateinit var floatValue: TextView
     private lateinit var floatStyleValue: TextView
     private lateinit var floatAlphaValue: TextView
@@ -45,6 +46,7 @@ class SettingsActivity : AppCompatActivity() {
         dedupValue = findViewById(R.id.dedupValue)
         enhanceValue = findViewById(R.id.enhanceValue)
         scaleValue = findViewById(R.id.scaleValue)
+        regionValue = findViewById(R.id.regionValue)
         floatValue = findViewById(R.id.floatValue)
         floatStyleValue = findViewById(R.id.floatStyleValue)
         floatAlphaValue = findViewById(R.id.floatAlphaValue)
@@ -69,6 +71,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<MaterialCardView>(R.id.dedupCard).setOnClickListener { showDedupDialog() }
         findViewById<MaterialCardView>(R.id.enhanceCard).setOnClickListener { showEnhanceDialog() }
         findViewById<MaterialCardView>(R.id.scaleCard).setOnClickListener { showScaleDialog() }
+        findViewById<MaterialCardView>(R.id.regionCard).setOnClickListener { showRegionDialog() }
         findViewById<MaterialCardView>(R.id.floatStyleCard).setOnClickListener { showFloatStyleDialog() }
 
         // 透明度滑块
@@ -147,6 +150,15 @@ class SettingsActivity : AppCompatActivity() {
         scaleValue.text = when (scale) {
             SettingsManager.SCALE_NATIVE -> "原生分辨率（不缩放）"
             else -> "${scale}px 宽"
+        }
+
+        // 识别区域
+        val region = SettingsManager.getRegion(this)
+        regionValue.text = when (region) {
+            SettingsManager.REGION_FULL -> "全屏（含OSD，最慢）"
+            SettingsManager.REGION_CENTER -> "中央区域（约56%）"
+            SettingsManager.REGION_LOWER -> "下方中央（约43%）"
+            else -> "图传安全区（约77%，推荐）"
         }
 
         // 悬浮窗
@@ -298,6 +310,32 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle("分析精度（小码必看）")
             .setSingleChoiceItems(items, checked) { dialog, which ->
                 SettingsManager.setScale(this, values[which])
+                dialog.dismiss()
+                refreshTexts()
+            }
+            .show()
+    }
+
+    private fun showRegionDialog() {
+        val items = arrayOf(
+            "图传安全区（约77%，推荐，避开OSD）",
+            "中央区域（约56%，更快）",
+            "下方中央（约43%，最快）",
+            "全屏（含OSD，最慢）"
+        )
+        val values = intArrayOf(
+            SettingsManager.REGION_VIDEO,
+            SettingsManager.REGION_CENTER,
+            SettingsManager.REGION_LOWER,
+            SettingsManager.REGION_FULL
+        )
+        var checked = values.indexOf(SettingsManager.getRegion(this))
+        if (checked < 0) checked = 0
+
+        AlertDialog.Builder(this)
+            .setTitle("识别区域（区域越小越快）")
+            .setSingleChoiceItems(items, checked) { dialog, which ->
+                SettingsManager.setRegion(this, values[which])
                 dialog.dismiss()
                 refreshTexts()
             }

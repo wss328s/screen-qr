@@ -53,6 +53,14 @@ object SettingsManager {
     const val SCALE_3200 = 3200
     const val DEFAULT_SCALE = SCALE_NATIVE
 
+    // 识别区域 ROI（只扫二维码会出现的区域，像素越少越快）
+    const val KEY_REGION = "region"
+    const val REGION_FULL = 0       // 全屏（含OSD，最慢）
+    const val REGION_VIDEO = 1      // 图传安全区，约77%（默认，推荐）
+    const val REGION_CENTER = 2     // 中央区域，约56%
+    const val REGION_LOWER = 3      // 下方中央，约43%
+    const val DEFAULT_REGION = REGION_VIDEO
+
     // 悬浮窗开关
     const val KEY_FLOAT = "float"
     const val DEFAULT_FLOAT = true
@@ -97,6 +105,17 @@ object SettingsManager {
 
     fun getScale(ctx: Context): Int = prefs(ctx).getInt(KEY_SCALE, DEFAULT_SCALE)
     fun setScale(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_SCALE, v).apply()
+
+    fun getRegion(ctx: Context): Int = prefs(ctx).getInt(KEY_REGION, DEFAULT_REGION)
+    fun setRegion(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_REGION, v).apply()
+
+    /** 返回 ROI 归一化边界 [left, top, right, bottom]（0..1） */
+    fun getRegionBounds(ctx: Context): FloatArray = when (getRegion(ctx)) {
+        REGION_FULL -> floatArrayOf(0f, 0f, 1f, 1f)
+        REGION_CENTER -> floatArrayOf(0.10f, 0.15f, 0.90f, 0.85f)
+        REGION_LOWER -> floatArrayOf(0.15f, 0.30f, 0.85f, 0.92f)
+        else -> floatArrayOf(0.03f, 0.09f, 0.97f, 0.91f) // REGION_VIDEO
+    }
 
     fun getFloat(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_FLOAT, DEFAULT_FLOAT)
     fun setFloat(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_FLOAT, v).apply()
