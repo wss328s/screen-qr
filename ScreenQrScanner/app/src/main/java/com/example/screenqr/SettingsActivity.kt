@@ -2,123 +2,100 @@ package com.example.screenqr
 
 import android.app.AlertDialog
 import android.os.Bundle
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class SettingsActivity : AppCompatActivity() {
 
-    private lateinit var fpsText: TextView
-    private lateinit var dedupText: TextView
-    private lateinit var enhanceText: TextView
-    private lateinit var scaleText: TextView
-    private lateinit var floatText: TextView
-    private lateinit var vibrateText: TextView
+    private lateinit var fpsValue: TextView
+    private lateinit var dedupValue: TextView
+    private lateinit var enhanceValue: TextView
+    private lateinit var scaleValue: TextView
+    private lateinit var floatValue: TextView
+    private lateinit var vibrateValue: TextView
+    private lateinit var floatSwitch: MaterialSwitch
+    private lateinit var vibrateSwitch: MaterialSwitch
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = "设置"
+        setContentView(R.layout.activity_settings)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 40, 40, 40)
+        fpsValue = findViewById(R.id.fpsValue)
+        dedupValue = findViewById(R.id.dedupValue)
+        enhanceValue = findViewById(R.id.enhanceValue)
+        scaleValue = findViewById(R.id.scaleValue)
+        floatValue = findViewById(R.id.floatValue)
+        vibrateValue = findViewById(R.id.vibrateValue)
+        floatSwitch = findViewById(R.id.floatSwitch)
+        vibrateSwitch = findViewById(R.id.vibrateSwitch)
+
+        findViewById<MaterialCardView>(R.id.fpsCard).setOnClickListener { showFpsDialog() }
+        findViewById<MaterialCardView>(R.id.dedupCard).setOnClickListener { showDedupDialog() }
+        findViewById<MaterialCardView>(R.id.enhanceCard).setOnClickListener { showEnhanceDialog() }
+        findViewById<MaterialCardView>(R.id.scaleCard).setOnClickListener { showScaleDialog() }
+
+        floatSwitch.setOnCheckedChangeListener { _, checked ->
+            SettingsManager.setFloat(this, checked)
+            floatValue.text = if (checked) "已开启" else "已关闭"
         }
 
-        val fpsBtn = Button(this).apply {
-            text = "识别频率"
-            setOnClickListener { showFpsDialog() }
+        vibrateSwitch.setOnCheckedChangeListener { _, checked ->
+            SettingsManager.setVibrate(this, checked)
+            vibrateValue.text = if (checked) "已开启" else "已关闭"
         }
-        layout.addView(fpsBtn)
-        fpsText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(fpsText)
-
-        val dedupBtn = Button(this).apply {
-            text = "去重窗口"
-            setOnClickListener { showDedupDialog() }
-        }
-        layout.addView(dedupBtn)
-        dedupText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(dedupText)
-
-        val enhanceBtn = Button(this).apply {
-            text = "识别增强"
-            setOnClickListener { showEnhanceDialog() }
-        }
-        layout.addView(enhanceBtn)
-        enhanceText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(enhanceText)
-
-        val scaleBtn = Button(this).apply {
-            text = "分析精度"
-            setOnClickListener { showScaleDialog() }
-        }
-        layout.addView(scaleBtn)
-        scaleText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(scaleText)
-
-        val floatBtn = Button(this).apply {
-            text = "悬浮窗"
-            setOnClickListener { toggleFloat() }
-        }
-        layout.addView(floatBtn)
-        floatText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(floatText)
-
-        val vibrateBtn = Button(this).apply {
-            text = "震动反馈"
-            setOnClickListener { toggleVibrate() }
-        }
-        layout.addView(vibrateBtn)
-        vibrateText = TextView(this).apply { textSize = 16f; setPadding(0, 20, 0, 20) }
-        layout.addView(vibrateText)
-
-        val scroll = ScrollView(this)
-        scroll.addView(layout)
-        setContentView(scroll)
 
         refreshTexts()
     }
 
     private fun refreshTexts() {
         val fps = SettingsManager.getFps(this)
-        fpsText.text = when (fps) {
-            SettingsManager.FPS_1 -> "识别频率：1 帧/秒"
-            SettingsManager.FPS_2 -> "识别频率：2 帧/秒"
-            SettingsManager.FPS_5 -> "识别频率：5 帧/秒"
-            SettingsManager.FPS_7_5 -> "识别频率：7.5 帧/秒"
-            SettingsManager.FPS_10 -> "识别频率：10 帧/秒"
-            else -> "识别频率：$fps 帧/秒"
+        fpsValue.text = when (fps) {
+            SettingsManager.FPS_1 -> "1 帧/秒（1000ms）"
+            SettingsManager.FPS_2 -> "2 帧/秒（500ms）"
+            SettingsManager.FPS_5 -> "5 帧/秒（200ms）"
+            SettingsManager.FPS_7_5 -> "7.5 帧/秒（133ms）"
+            SettingsManager.FPS_10 -> "10 帧/秒（100ms）"
+            else -> "$fps 帧/秒"
         }
 
         val dedup = SettingsManager.getDedup(this)
-        dedupText.text = "去重窗口：$dedup 秒"
+        dedupValue.text = "$dedup 秒"
 
         val enhance = SettingsManager.getEnhance(this)
-        enhanceText.text = when (enhance) {
-            SettingsManager.ENHANCE_OFF -> "识别增强：关闭"
-            SettingsManager.ENHANCE_STD -> "识别增强：标准"
-            SettingsManager.ENHANCE_STRONG -> "识别增强：增强"
-            else -> "识别增强：未知"
+        enhanceValue.text = when (enhance) {
+            SettingsManager.ENHANCE_OFF -> "关闭"
+            SettingsManager.ENHANCE_STD -> "标准（对比度增强）"
+            SettingsManager.ENHANCE_STRONG -> "增强（锐化+对比度）"
+            else -> "未知"
         }
 
         val scale = SettingsManager.getScale(this)
-        scaleText.text = when (scale) {
-            SettingsManager.SCALE_NATIVE -> "分析精度：原生分辨率"
-            else -> "分析精度：${scale}px 宽"
+        scaleValue.text = when (scale) {
+            SettingsManager.SCALE_NATIVE -> "原生分辨率（不缩放）"
+            else -> "${scale}px 宽"
         }
 
-        floatText.text = "悬浮窗：" + if (SettingsManager.getFloat(this)) "开" else "关"
-        vibrateText.text = "震动反馈：" + if (SettingsManager.getVibrate(this)) "开" else "关"
+        val floatOn = SettingsManager.getFloat(this)
+        floatSwitch.isChecked = floatOn
+        floatValue.text = if (floatOn) "已开启" else "已关闭"
+
+        val vibrateOn = SettingsManager.getVibrate(this)
+        vibrateSwitch.isChecked = vibrateOn
+        vibrateValue.text = if (vibrateOn) "已开启" else "已关闭"
     }
 
     private fun showFpsDialog() {
-        val items = arrayOf("1 帧/秒（1000ms）", "2 帧/秒（500ms）", "5 帧/秒（200ms）", "7.5 帧/秒（133ms）", "10 帧/秒（100ms）")
-        val values = intArrayOf(SettingsManager.FPS_1, SettingsManager.FPS_2, SettingsManager.FPS_5, SettingsManager.FPS_7_5, SettingsManager.FPS_10)
-        val current = SettingsManager.getFps(this)
-        var checked = values.indexOf(current)
+        val items = arrayOf(
+            "1 帧/秒（1000ms）", "2 帧/秒（500ms）", "5 帧/秒（200ms）",
+            "7.5 帧/秒（133ms）", "10 帧/秒（100ms）"
+        )
+        val values = intArrayOf(
+            SettingsManager.FPS_1, SettingsManager.FPS_2, SettingsManager.FPS_5,
+            SettingsManager.FPS_7_5, SettingsManager.FPS_10
+        )
+        var checked = values.indexOf(SettingsManager.getFps(this))
         if (checked < 0) checked = 2
 
         AlertDialog.Builder(this)
@@ -134,8 +111,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun showDedupDialog() {
         val items = arrayOf("3 秒", "5 秒", "10 秒")
         val values = intArrayOf(SettingsManager.DEDUP_3, SettingsManager.DEDUP_5, SettingsManager.DEDUP_10)
-        val current = SettingsManager.getDedup(this)
-        var checked = values.indexOf(current)
+        var checked = values.indexOf(SettingsManager.getDedup(this))
         if (checked < 0) checked = 1
 
         AlertDialog.Builder(this)
@@ -151,8 +127,7 @@ class SettingsActivity : AppCompatActivity() {
     private fun showEnhanceDialog() {
         val items = arrayOf("关闭", "标准（对比度增强）", "增强（锐化+对比度）")
         val values = intArrayOf(SettingsManager.ENHANCE_OFF, SettingsManager.ENHANCE_STD, SettingsManager.ENHANCE_STRONG)
-        val current = SettingsManager.getEnhance(this)
-        var checked = values.indexOf(current)
+        var checked = values.indexOf(SettingsManager.getEnhance(this))
         if (checked < 0) checked = 1
 
         AlertDialog.Builder(this)
@@ -168,24 +143,16 @@ class SettingsActivity : AppCompatActivity() {
     private fun showScaleDialog() {
         val items = arrayOf(
             "原生分辨率（不缩放，小码必看）",
-            "3200px 宽",
-            "2400px 宽",
-            "1500px 宽",
-            "1200px 宽",
-            "1080px 宽",
-            "800px 宽（快）"
+            "3200px 宽", "2400px 宽", "1500px 宽",
+            "1200px 宽", "1080px 宽", "800px 宽（快）"
         )
         val values = intArrayOf(
             SettingsManager.SCALE_NATIVE,
-            SettingsManager.SCALE_3200,
-            SettingsManager.SCALE_2400,
-            SettingsManager.SCALE_1500,
-            SettingsManager.SCALE_1200,
-            SettingsManager.SCALE_1080,
-            SettingsManager.SCALE_800
+            SettingsManager.SCALE_3200, SettingsManager.SCALE_2400,
+            SettingsManager.SCALE_1500, SettingsManager.SCALE_1200,
+            SettingsManager.SCALE_1080, SettingsManager.SCALE_800
         )
-        val current = SettingsManager.getScale(this)
-        var checked = values.indexOf(current)
+        var checked = values.indexOf(SettingsManager.getScale(this))
         if (checked < 0) checked = 0
 
         AlertDialog.Builder(this)
@@ -196,19 +163,5 @@ class SettingsActivity : AppCompatActivity() {
                 refreshTexts()
             }
             .show()
-    }
-
-    private fun toggleFloat() {
-        val cur = SettingsManager.getFloat(this)
-        SettingsManager.setFloat(this, !cur)
-        Toast.makeText(this, if (!cur) "悬浮窗已开" else "悬浮窗已关", Toast.LENGTH_SHORT).show()
-        refreshTexts()
-    }
-
-    private fun toggleVibrate() {
-        val cur = SettingsManager.getVibrate(this)
-        SettingsManager.setVibrate(this, !cur)
-        Toast.makeText(this, if (!cur) "震动已开" else "震动已关", Toast.LENGTH_SHORT).show()
-        refreshTexts()
     }
 }
