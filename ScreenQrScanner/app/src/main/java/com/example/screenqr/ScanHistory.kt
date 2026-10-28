@@ -69,6 +69,13 @@ object ScanHistory {
         return sb.toString().trimEnd()
     }
 
+    // 已记录数量
+    val count: Int get() = items.size
+
+    // 悬浮窗列表：每行 "• 内容"
+    fun listText(): String =
+        items.joinToString("\n") { "• $it" }
+
     fun fullSummary(): String {
         return items.joinToString("\n")
     }
