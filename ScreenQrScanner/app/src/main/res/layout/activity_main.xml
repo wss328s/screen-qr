@@ -36,4 +36,12 @@
         android:paddingHorizontal="32dp"
         android:layout_marginTop="12dp"/>
 
+    <Button
+        android:id="@+id/settingsBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="设置"
+        android:paddingHorizontal="32dp"
+        android:layout_marginTop="12dp"/>
+
 </LinearLayout>
