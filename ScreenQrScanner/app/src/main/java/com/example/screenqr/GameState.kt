@@ -2,7 +2,7 @@ package com.example.screenqr
 
 /**
  * 比赛导航：4个岔路，每个3个码，自动连续识别。
- * - 同一个码5秒内不重复记录
+ * - 同一个码重置前只记录一次（永久去重）
  * - 满3个自动跳到下一组
  */
 object GameState {
@@ -25,14 +25,14 @@ object GameState {
         private set
     var totalRead = 0
         private set
-    private val recentCodes = LinkedHashMap<String, Long>()
-    private val dedupTtl = 5000L
+    // 永久去重：重置前同一码只记录一次
+    private val seenCodes = mutableSetOf<String>()
 
     fun reset() {
         legs.forEach { it.codes.clear() }
         currentLegIndex = 0
         totalRead = 0
-        recentCodes.clear()
+        seenCodes.clear()
     }
 
     fun parseAndRecord(raw: String): Boolean {
@@ -40,9 +40,8 @@ object GameState {
         val numStr = Regex("\\d+").find(s)?.value ?: return false
         val value = numStr.toIntOrNull() ?: return false
 
-        val now = System.currentTimeMillis()
-        recentCodes.entries.removeIf { now - it.value > dedupTtl }
-        if (recentCodes.containsKey(s)) return false
+        // 永久去重
+        if (seenCodes.contains(s)) return false
 
         if (currentLegIndex >= 3 && legs[3].isComplete) return false
         val leg = legs[currentLegIndex]
@@ -50,7 +49,7 @@ object GameState {
 
         leg.codes.add(value)
         totalRead++
-        recentCodes[s] = now
+        seenCodes.add(s)
 
         if (leg.isComplete && currentLegIndex < 3) {
             currentLegIndex++

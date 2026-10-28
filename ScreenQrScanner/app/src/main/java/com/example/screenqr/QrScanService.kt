@@ -157,7 +157,6 @@ class QrScanService : Service() {
         } else {
             ScanHistory.reset()
         }
-        recent.clear()
         FloatingResultManager.update(this)
 
         isRunning = true
@@ -201,12 +200,11 @@ class QrScanService : Service() {
             val scaledW = scaled.width
             val scaledH = scaled.height
             val result = QrDecoder.decode(scaled, enhanceMode)
-
             scaled.recycle()
 
             if (result != null) {
                 if (workMode == SettingsManager.MODE_GAME) {
-                    // 比赛导航模式：永久去重，新码才反馈
+                    // 比赛导航模式
                     val isNew = GameState.parseAndRecord(result.text)
                     if (isNew) {
                         qrCount++

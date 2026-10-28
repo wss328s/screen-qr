@@ -5,16 +5,16 @@ import android.graphics.Color
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
+import com.google.zxing.LuminanceSource
 import com.google.zxing.MultiFormatReader
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.GlobalHistogramBinarizer
 import com.google.zxing.common.HybridBinarizer
-import com.google.zxing.qrcode.detector.Detector
 
 /**
  * 强化识别：返回内容+位置坐标。
- * 针对：模糊（锐化）、反光/光照不均（局部二值化/全局二值化/反色）、
- * 对比度低（对比度拉伸）、畸形/旋转（多角度尝试）。
+ * 针对：模糊（锐化）、反光/光照不均（局部/全局二值化、反色、反光抑制、自适应分块）、
+ * 对比度低（对比度拉伸）、畸形/旋转（任意角度、90/180/270）。
  */
 object QrDecoder {
 
@@ -39,16 +39,16 @@ object QrDecoder {
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        // 1. 原图：Hybrid（局部自适应，抗反光/光照不均）
+        // 1. 原图 Hybrid（局部自适应，抗反光/光照不均）
         tryDecode(w, h, pixels, false, true)?.let { return it }
 
-        // 2. 原图：Global（全局阈值，有时比局部更稳）
+        // 2. 原图 Global（全局阈值，有时更稳）
         tryDecode(w, h, pixels, false, false)?.let { return it }
 
-        // 3. 反色：Hybrid（白码黑底/深色码）
+        // 3. 反色 Hybrid（白码黑底）
         tryDecode(w, h, pixels, true, true)?.let { return it }
 
-        // 4. 反色：Global
+        // 4. 反色 Global
         tryDecode(w, h, pixels, true, false)?.let { return it }
 
         if (enhanceMode != SettingsManager.ENHANCE_OFF) {
@@ -57,7 +57,7 @@ object QrDecoder {
             tryDecode(w, h, contrast, false, true)?.let { return it }
             tryDecode(w, h, contrast, false, false)?.let { return it }
 
-            // 6. 反光抑制（压缩高亮）+ 局部二值化
+            // 6. 反光抑制（压缩高亮）
             val antiGlare = suppressGlare(pixels)
             tryDecode(w, h, antiGlare, false, true)?.let { return it }
 
@@ -71,7 +71,7 @@ object QrDecoder {
                 val adaptive = adaptiveThreshold(pixels, w, h)
                 tryDecode(w, h, adaptive, false, true)?.let { return it }
 
-                // 8.5 倾斜：任意角度（图传画面非正对），配合锐化
+                // 9. 倾斜：任意角度（图传非正对），配合锐化
                 for (ang in listOf(30f, 45f, 60f)) {
                     val rot = rotateFree(pixels, w, h, ang)
                     tryDecode(rot.width, rot.height, rot.pixels, false, true)?.let { return it }
@@ -81,38 +81,12 @@ object QrDecoder {
             }
         }
 
-        // 9. 旋转（畸形/倒置），最后做（慢）
+        // 10. 旋转（畸形/倒置），最后做
         tryDecodeRotated(w, h, pixels, 90)?.let { return it }
         tryDecodeRotated(w, h, pixels, 180)?.let { return it }
         tryDecodeRotated(w, h, pixels, 270)?.let { return it }
 
         return null
-    }
-
-    /**
-     * 疑似检测：能定位到二维码但没解码成功。
-     * 用于"疑似码未解析"提示。
-     */
-    fun detectSuspect(bitmap: Bitmap): Boolean {
-        val w = bitmap.width
-        val h = bitmap.height
-        val pixels = IntArray(w * h)
-        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-        return try {
-            val src = RGBLuminanceSource(w, h, pixels)
-            val bits = HybridBinarizer(src).blackMatrix
-            Detector(bits).detect()
-            true
-        } catch (e: Exception) {
-            try {
-                val src = RGBLuminanceSource(w, h, pixels)
-                val bits = GlobalHistogramBinarizer(src).blackMatrix
-                Detector(bits).detect()
-                true
-            } catch (e2: Exception) {
-                false
-            }
-        }
     }
 
     private fun toResult(r: com.google.zxing.Result): DecodeResult =
@@ -123,7 +97,7 @@ object QrDecoder {
 
     private fun tryDecode(w: Int, h: Int, pixels: IntArray, invert: Boolean, hybrid: Boolean): DecodeResult? {
         return try {
-            var src: com.google.zxing.LuminanceSource = RGBLuminanceSource(w, h, pixels)
+            var src: LuminanceSource = RGBLuminanceSource(w, h, pixels)
             if (invert) src = src.invert()
             val binary = if (hybrid) BinaryBitmap(HybridBinarizer(src))
                          else BinaryBitmap(GlobalHistogramBinarizer(src))
@@ -176,7 +150,6 @@ object QrDecoder {
         val out = IntArray(pixels.size)
         for (i in pixels.indices) {
             val g = gray(pixels[i])
-            // 高亮部分用 gamma 压暗
             val ng = if (g > 180) {
                 (180 + (g - 180) * 0.4f).toInt()
             } else g
@@ -194,7 +167,6 @@ object QrDecoder {
                 val c = gray(pixels[i])
                 val l = gray(pixels[i - 1]); val rr = gray(pixels[i + 1])
                 val u = gray(pixels[i - w]); val d = gray(pixels[i + w])
-                // 锐化核：中心5，四邻-1
                 var v = 5 * c - l - rr - u - d
                 v = v.coerceIn(0, 255)
                 out[i] = Color.rgb(v, v, v)
@@ -227,10 +199,10 @@ object QrDecoder {
         return out
     }
 
+    /** 任意角度旋转（输出扩展到能容纳整图） */
     private fun rotateFree(pixels: IntArray, w: Int, h: Int, angleDeg: Float): RotatedData {
         val rad = Math.toRadians(angleDeg.toDouble())
         val cos = Math.cos(rad); val sin = Math.sin(rad)
-        // 输出尺寸：旋转后扩展到能容纳整图
         val outW = (Math.abs(w * cos) + Math.abs(h * sin)).toInt().coerceAtLeast(1)
         val outH = (Math.abs(w * sin) + Math.abs(h * cos)).toInt().coerceAtLeast(1)
         val out = IntArray(outW * outH) { Color.BLACK }
@@ -240,7 +212,6 @@ object QrDecoder {
 
         for (oy in 0 until outH) {
             for (ox in 0 until outW) {
-                // 反算源坐标
                 val dx = ox - ocx; val dy = oy - ocy
                 val sx = (cos * dx + sin * dy + cx).toInt()
                 val sy = (-sin * dx + cos * dy + cy).toInt()
