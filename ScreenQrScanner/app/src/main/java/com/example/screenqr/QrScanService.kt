@@ -16,6 +16,7 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
@@ -35,6 +36,9 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
+        // 识别解码的最大宽度（保护上限，QR识别不需要更高）
+        private const val MAX_DECODE_WIDTH = 1920
+
         @Volatile
         var isRunning = false
             private set
@@ -50,7 +54,14 @@ class QrScanService : Service() {
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
-    private val handler = Handler(Looper.getMainLooper())
+
+    // 主线程handler：用于更新悬浮窗、通知
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    // 后台线程：所有截屏+识别重计算都在这里，避免阻塞主线程ANR
+    private val workerThread = HandlerThread("QrScanWorker").apply { start() }
+    private val scanHandler = Handler(workerThread.looper)
+
     private val recent = LinkedHashMap<String, Long>()
 
     private var screenW = 0
@@ -65,16 +76,17 @@ class QrScanService : Service() {
     private val scanRunnable = object : Runnable {
         override fun run() {
             val found = scanOnce()
-            // 识别失败立刻重试（不等150ms），成功了才等下一个周期
-            val delay = if (found) scanIntervalMs else 0L
-            handler.postDelayed(this, delay)
+            // 识别失败也保留一个最小间隔，避免紧密循环占满CPU/内存；
+            // 成功后按设定周期等待
+            val delay = if (found) scanIntervalMs else maxOf(scanIntervalMs, 30L)
+            scanHandler.postDelayed(this, delay)
         }
     }
 
     private val statusUpdateRunnable = object : Runnable {
         override fun run() {
             updateStatusNotification()
-            handler.postDelayed(this, 2000)
+            mainHandler.postDelayed(this, 2000)
         }
     }
 
@@ -116,11 +128,11 @@ class QrScanService : Service() {
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
                 // 系统主动停止截屏，不要直接杀服务，更新通知让用户看到
-                handler.post {
+                mainHandler.post {
                     updateStatusNotification()
                 }
             }
-        }, null)
+        }, mainHandler)
 
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val metrics = DisplayMetrics()
@@ -163,8 +175,9 @@ class QrScanService : Service() {
         updateStatusNotification()
         // 预加载音效
         FloatingResultManager.preloadSound(this)
-        handler.postDelayed(scanRunnable, 300)
-        handler.postDelayed(statusUpdateRunnable, 1000)
+        // 扫描循环在后台线程；状态通知在主线程
+        scanHandler.postDelayed(scanRunnable, 300)
+        mainHandler.postDelayed(statusUpdateRunnable, 1000)
     }
 
     private fun scanOnce(): Boolean {
@@ -190,9 +203,11 @@ class QrScanService : Service() {
                 Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
             } else bitmap
 
-            val scaled = if (scaleWidth > 0 && screenW > scaleWidth) {
-                val scaleH = (scaleWidth * screenH / screenW.toFloat()).toInt()
-                Bitmap.createScaledBitmap(cropped, scaleWidth, scaleH, false).also {
+            // 识别目标宽度：NATIVE时也加保护上限，避免2K/4K屏爆内存
+            val targetWidth = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
+            val scaled = if (screenW > targetWidth) {
+                val scaleH = (targetWidth * screenH / screenW.toFloat()).toInt()
+                Bitmap.createScaledBitmap(cropped, targetWidth, scaleH, false).also {
                     if (it != cropped) cropped.recycle()
                 }
             } else cropped
@@ -209,8 +224,10 @@ class QrScanService : Service() {
                     if (isNew) {
                         qrCount++
                         found = true
-                        FloatingResultManager.update(this)
-                        FloatingResultManager.notifyRead(this)
+                        mainHandler.post {
+                            FloatingResultManager.update(this)
+                            FloatingResultManager.notifyRead(this)
+                        }
                     }
                 } else {
                     // 纯扫码模式
@@ -220,11 +237,11 @@ class QrScanService : Service() {
                     if (isNew) {
                         qrCount++
                         found = true
-                        FloatingResultManager.update(this)
+                        mainHandler.post { FloatingResultManager.update(this) }
                     }
 
                     if (shouldNotify) {
-                        FloatingResultManager.notifyRead(this)
+                        mainHandler.post { FloatingResultManager.notifyRead(this) }
                     }
                 }
             }
@@ -276,12 +293,13 @@ class QrScanService : Service() {
 
     override fun onDestroy() {
         isRunning = false
-        handler.removeCallbacks(scanRunnable)
-        handler.removeCallbacks(statusUpdateRunnable)
+        scanHandler.removeCallbacks(scanRunnable)
+        mainHandler.removeCallbacks(statusUpdateRunnable)
         try { virtualDisplay?.release() } catch (_: Exception) {}
         try { imageReader?.close() } catch (_: Exception) {}
         try { mediaProjection?.stop() } catch (_: Exception) {}
         FloatingResultManager.hideAll(this)
+        workerThread.quitSafely()
         super.onDestroy()
     }
 }
