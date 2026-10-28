@@ -21,6 +21,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var dedupValue: TextView
     private lateinit var enhanceValue: TextView
     private lateinit var scaleValue: TextView
+    private lateinit var regionValue: TextView
     private lateinit var floatValue: TextView
     private lateinit var floatStyleValue: TextView
     private lateinit var floatAlphaValue: TextView
@@ -29,6 +30,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var vibrateSwitch: MaterialSwitch
     private lateinit var soundSwitch: MaterialSwitch
     private lateinit var soundValue: TextView
+    private lateinit var liveCodeSwitch: MaterialSwitch
+    private lateinit var liveCodeValue: TextView
     private lateinit var deviceInfo: TextView
 
     companion object {
@@ -45,6 +48,7 @@ class SettingsActivity : AppCompatActivity() {
         dedupValue = findViewById(R.id.dedupValue)
         enhanceValue = findViewById(R.id.enhanceValue)
         scaleValue = findViewById(R.id.scaleValue)
+        regionValue = findViewById(R.id.regionValue)
         floatValue = findViewById(R.id.floatValue)
         floatStyleValue = findViewById(R.id.floatStyleValue)
         floatAlphaValue = findViewById(R.id.floatAlphaValue)
@@ -53,6 +57,8 @@ class SettingsActivity : AppCompatActivity() {
         vibrateSwitch = findViewById(R.id.vibrateSwitch)
         soundSwitch = findViewById(R.id.soundSwitch)
         soundValue = findViewById(R.id.soundValue)
+        liveCodeSwitch = findViewById(R.id.liveCodeSwitch)
+        liveCodeValue = findViewById(R.id.liveCodeValue)
         deviceInfo = findViewById(R.id.deviceInfo)
 
         // 悬浮窗权限申请
@@ -69,6 +75,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<MaterialCardView>(R.id.dedupCard).setOnClickListener { showDedupDialog() }
         findViewById<MaterialCardView>(R.id.enhanceCard).setOnClickListener { showEnhanceDialog() }
         findViewById<MaterialCardView>(R.id.scaleCard).setOnClickListener { showScaleDialog() }
+        findViewById<MaterialCardView>(R.id.regionCard).setOnClickListener { showRegionDialog() }
         findViewById<MaterialCardView>(R.id.floatStyleCard).setOnClickListener { showFloatStyleDialog() }
 
         // 透明度滑块
@@ -96,6 +103,11 @@ class SettingsActivity : AppCompatActivity() {
         soundSwitch.setOnCheckedChangeListener { _, checked ->
             SettingsManager.setSound(this, checked)
             soundValue.text = if (checked) "已开启" else "已关闭"
+        }
+
+        liveCodeSwitch.setOnCheckedChangeListener { _, checked ->
+            SettingsManager.setLiveCode(this, checked)
+            liveCodeValue.text = if (checked) "已开启" else "已关闭"
         }
 
         refreshTexts()
@@ -149,6 +161,14 @@ class SettingsActivity : AppCompatActivity() {
             else -> "${scale}px 宽"
         }
 
+        // 识别区域 ROI
+        regionValue.text = when (SettingsManager.getRegion(this)) {
+            SettingsManager.REGION_FULL -> "全屏（含OSD，最慢）"
+            SettingsManager.REGION_CENTER -> "中央区域（约56%）"
+            SettingsManager.REGION_LOWER -> "下方中央（约43%，最快）"
+            else -> "图传安全区（约77%，推荐）"
+        }
+
         // 悬浮窗
         val floatOn = SettingsManager.getFloat(this)
         floatSwitch.isChecked = floatOn
@@ -180,6 +200,11 @@ class SettingsActivity : AppCompatActivity() {
         val soundOn = SettingsManager.getSound(this)
         soundSwitch.isChecked = soundOn
         soundValue.text = if (soundOn) "已开启" else "已关闭"
+
+        // 活码解析
+        val liveOn = SettingsManager.getLiveCode(this)
+        liveCodeSwitch.isChecked = liveOn
+        liveCodeValue.text = if (liveOn) "已开启" else "已关闭"
 
         // 设备信息
         deviceInfo.text = buildDeviceInfo()
@@ -304,8 +329,33 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showFloatStyleDialog() {
+    private fun showRegionDialog() {
         val items = arrayOf(
+            "图传安全区（约77%，推荐）",
+            "中央区域（约56%）",
+            "下方中央（约43%，最快）",
+            "全屏（含OSD，最慢）"
+        )
+        val values = intArrayOf(
+            SettingsManager.REGION_VIDEO,
+            SettingsManager.REGION_CENTER,
+            SettingsManager.REGION_LOWER,
+            SettingsManager.REGION_FULL
+        )
+        var checked = values.indexOf(SettingsManager.getRegion(this))
+        if (checked < 0) checked = 0
+
+        AlertDialog.Builder(this)
+            .setTitle("识别区域（像素越少越快）")
+            .setSingleChoiceItems(items, checked) { dialog, which ->
+                SettingsManager.setRegion(this, values[which])
+                dialog.dismiss()
+                refreshTexts()
+            }
+            .show()
+    }
+
+    private fun showFloatStyleDialog() {        val items = arrayOf(
             "深色", "浅色", "透明",
             "紫色渐变", "蓝色科技", "橙色活力", "绿色护眼"
         )
