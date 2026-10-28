@@ -351,7 +351,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="深色 / 浅色 / 透明"
+                    android:text="深色 / 浅色 / 透明 / 紫色 / 蓝色 / 橙色 / 绿色"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
                     android:layout_marginTop="6dp"/>
@@ -419,7 +419,7 @@
             app:cardBackgroundColor="@color/card_bg"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            android:layout_marginBottom="10dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -454,6 +454,54 @@
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/vibrateSwitch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 音效 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/soundCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="20dp"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="音效反馈"
+                        android:textColor="@color/white"
+                        android:textSize="17sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/soundValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="已开启"
+                        android:textColor="@color/accent"
+                        android:textSize="14sp"
+                        android:layout_marginTop="6dp"/>
+                </LinearLayout>
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/soundSwitch"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"/>
             </LinearLayout>
