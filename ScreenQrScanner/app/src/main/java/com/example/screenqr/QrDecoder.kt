@@ -72,7 +72,7 @@ object QrDecoder {
                 tryDecode(w, h, adaptive, false, true)?.let { return it }
 
                 // 8.5 倾斜：任意角度（图传画面非正对），配合锐化
-                for (ang in listOf(30, 45, 60)) {
+                for (ang in listOf(30f, 45f, 60f)) {
                     val rot = rotateFree(pixels, w, h, ang)
                     tryDecode(rot.width, rot.height, rot.pixels, false, true)?.let { return it }
                     val rotS = sharpen(rot.pixels, rot.width, rot.height)
@@ -123,7 +123,7 @@ object QrDecoder {
 
     private fun tryDecode(w: Int, h: Int, pixels: IntArray, invert: Boolean, hybrid: Boolean): DecodeResult? {
         return try {
-            var src = RGBLuminanceSource(w, h, pixels)
+            var src: com.google.zxing.LuminanceSource = RGBLuminanceSource(w, h, pixels)
             if (invert) src = src.invert()
             val binary = if (hybrid) BinaryBitmap(HybridBinarizer(src))
                          else BinaryBitmap(GlobalHistogramBinarizer(src))
@@ -172,7 +172,7 @@ object QrDecoder {
     }
 
     /** 反光抑制：压缩高亮区域，保留暗部细节 */
-    private fun suppressGlare(pixels: Int): IntArray {
+    private fun suppressGlare(pixels: IntArray): IntArray {
         val out = IntArray(pixels.size)
         for (i in pixels.indices) {
             val g = gray(pixels[i])
