@@ -23,6 +23,12 @@ object FloatingResultManager {
     private var currentView: View? = null
 
     fun update(ctx: Context) {
+        // 悬浮窗开关关了，不显示
+        if (!SettingsManager.getFloat(ctx)) {
+            hideAll(ctx)
+            return
+        }
+
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val text = ScanHistory.statusText()
 
@@ -69,6 +75,9 @@ object FloatingResultManager {
     }
 
     fun notifyRead(ctx: Context) {
+        // 震动开关关了，不震动
+        if (!SettingsManager.getVibrate(ctx)) return
+
         val v = ctx.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             v.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))

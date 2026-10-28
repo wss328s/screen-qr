@@ -35,14 +35,16 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        private const val SCAN_INTERVAL_MS = 150L
-        private const val DEDUP_TTL_MS = 5000L
-        private const val SCALE_WIDTH = 1500
-
         @Volatile
         var isRunning = false
             private set
     }
+
+    // 从设置读取参数
+    private val scanIntervalMs: Long get() = SettingsManager.fpsToIntervalMs(SettingsManager.getFps(this))
+    private val dedupTtlMs: Long get() = SettingsManager.getDedup(this).toLong() * 1000
+    private val scaleWidth: Int get() = SettingsManager.getScale(this)
+    private val enhanceMode: Int get() = SettingsManager.getEnhance(this)
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -63,7 +65,7 @@ class QrScanService : Service() {
         override fun run() {
             val found = scanOnce()
             // 识别失败立刻重试（不等150ms），成功了才等下一个周期
-            val delay = if (found) SCAN_INTERVAL_MS else 0L
+            val delay = if (found) scanIntervalMs else 0L
             handler.postDelayed(this, delay)
         }
     }
@@ -181,16 +183,16 @@ class QrScanService : Service() {
                 Bitmap.createBitmap(bitmap, 0, 0, screenW, screenH).also { bitmap.recycle() }
             } else bitmap
 
-            val scaled = if (SCALE_WIDTH > 0 && screenW > SCALE_WIDTH) {
-                val scaleH = (SCALE_WIDTH * screenH / screenW.toFloat()).toInt()
-                Bitmap.createScaledBitmap(cropped, SCALE_WIDTH, scaleH, false).also {
+            val scaled = if (scaleWidth > 0 && screenW > scaleWidth) {
+                val scaleH = (scaleWidth * screenH / screenW.toFloat()).toInt()
+                Bitmap.createScaledBitmap(cropped, scaleWidth, scaleH, false).also {
                     if (it != cropped) cropped.recycle()
                 }
             } else cropped
 
             val scaledW = scaled.width
             val scaledH = scaled.height
-            val result = QrDecoder.decode(scaled)
+            val result = QrDecoder.decode(scaled, enhanceMode)
             scaled.recycle()
 
             if (result != null) {
@@ -210,7 +212,7 @@ class QrScanService : Service() {
 
     private fun isDuplicate(content: String): Boolean {
         val now = System.currentTimeMillis()
-        recent.entries.removeIf { now - it.value > DEDUP_TTL_MS }
+        recent.entries.removeIf { now - it.value > dedupTtlMs }
         if (recent.containsKey(content)) return true
         recent[content] = now
         return false

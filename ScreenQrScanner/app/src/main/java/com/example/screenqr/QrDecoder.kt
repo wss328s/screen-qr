@@ -29,7 +29,7 @@ object QrDecoder {
         )
     }
 
-    fun decode(bitmap: Bitmap): DecodeResult? {
+    fun decode(bitmap: Bitmap, enhanceMode: Int = SettingsManager.ENHANCE_STD): DecodeResult? {
         val w = bitmap.width
         val h = bitmap.height
         val pixels = IntArray(w * h)
@@ -47,7 +47,17 @@ object QrDecoder {
         result = tryDecodeRotated(w, h, pixels, 180)
         if (result != null) return result
 
-        result = tryDecodeEnhanced(w, h, pixels)
+        // 根据增强模式决定是否做增强
+        if (enhanceMode == SettingsManager.ENHANCE_OFF) return null
+
+        // 标准：对比度增强
+        result = tryDecodeEnhanced(w, h, pixels, strong = false)
+        if (result != null) return result
+
+        // 增强：锐化+对比度
+        if (enhanceMode == SettingsManager.ENHANCE_STRONG) {
+            result = tryDecodeEnhanced(w, h, pixels, strong = true)
+        }
         return result
     }
 
@@ -79,18 +89,37 @@ object QrDecoder {
         }
     }
 
-    private fun tryDecodeEnhanced(w: Int, h: Int, pixels: IntArray): DecodeResult? {
+    private fun tryDecodeEnhanced(w: Int, h: Int, pixels: IntArray, strong: Boolean = false): DecodeResult? {
         return try {
             val enhanced = IntArray(pixels.size)
             for (i in pixels.indices) {
                 val c = pixels[i]
-                val r = Color.red(c)
-                val g = Color.green(c)
-                val b = Color.blue(c)
-                val nr = (r * 1.5f).toInt().coerceIn(0, 255)
-                val ng = (g * 1.5f).toInt().coerceIn(0, 255)
-                val nb = (b * 1.5f).toInt().coerceIn(0, 255)
-                enhanced[i] = Color.rgb(nr, ng, nb)
+                var r = Color.red(c)
+                var g = Color.green(c)
+                var b = Color.blue(c)
+                // 对比度增强
+                r = (r * 1.5f).toInt().coerceIn(0, 255)
+                g = (g * 1.5f).toInt().coerceIn(0, 255)
+                b = (b * 1.5f).toInt().coerceIn(0, 255)
+                // 锐化（strong模式）：中心像素加权
+                if (strong && i > w && i < pixels.size - w && i % w in 1 until w - 1) {
+                    val center = pixels[i]
+                    val left = pixels[i - 1]
+                    val right = pixels[i + 1]
+                    val top = pixels[i - w]
+                    val bottom = pixels[i + w]
+                    val centerR = Color.red(center)
+                    val centerG = Color.green(center)
+                    val centerB = Color.blue(center)
+                    val avgR = (Color.red(left) + Color.red(right) + Color.red(top) + Color.red(bottom)) / 4
+                    val avgG = (Color.green(left) + Color.green(right) + Color.green(top) + Color.green(bottom)) / 4
+                    val avgB = (Color.blue(left) + Color.blue(right) + Color.blue(top) + Color.blue(bottom)) / 4
+                    // 锐化：中心 - 周围*0.5
+                    r = (centerR * 1.5f - avgR * 0.5f).toInt().coerceIn(0, 255)
+                    g = (centerG * 1.5f - avgG * 0.5f).toInt().coerceIn(0, 255)
+                    b = (centerB * 1.5f - avgB * 0.5f).toInt().coerceIn(0, 255)
+                }
+                enhanced[i] = Color.rgb(r, g, b)
             }
             val src = RGBLuminanceSource(w, h, enhanced)
             val binary = BinaryBitmap(HybridBinarizer(src))

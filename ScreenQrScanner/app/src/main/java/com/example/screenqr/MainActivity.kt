@@ -39,6 +39,9 @@ class MainActivity : AppCompatActivity() {
             startService(Intent(this, QrScanService::class.java).setAction(QrScanService.ACTION_STOP))
             refreshStatus()
         }
+        findViewById<Button>(R.id.settingsBtn).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
 
         // Android 13+ 通知权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
