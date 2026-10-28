@@ -88,8 +88,4 @@ object GameState {
         }
         return sb.toString()
     }
-
-    // 悬浮窗列表：当前岔路已识别的码，每行 "• value"
-    fun listText(): String =
-        legs[currentLegIndex].codes.joinToString("\n") { "• $it" }
 }

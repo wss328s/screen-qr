@@ -122,6 +122,10 @@ class SettingsActivity : AppCompatActivity() {
             SettingsManager.FPS_5 -> "5 帧/秒（200ms）"
             SettingsManager.FPS_7_5 -> "7.5 帧/秒（133ms）"
             SettingsManager.FPS_10 -> "10 帧/秒（100ms）"
+            SettingsManager.FPS_15 -> "15 帧/秒（66ms）"
+            SettingsManager.FPS_20 -> "20 帧/秒（50ms）"
+            SettingsManager.FPS_25 -> "25 帧/秒（40ms）"
+            SettingsManager.FPS_30 -> "30 帧/秒（33ms）"
             else -> "$fps 帧/秒"
         }
 
@@ -220,11 +224,15 @@ class SettingsActivity : AppCompatActivity() {
     private fun showFpsDialog() {
         val items = arrayOf(
             "1 帧/秒（1000ms）", "2 帧/秒（500ms）", "5 帧/秒（200ms）",
-            "7.5 帧/秒（133ms）", "10 帧/秒（100ms）"
+            "7.5 帧/秒（133ms）", "10 帧/秒（100ms）",
+            "15 帧/秒（66ms）", "20 帧/秒（50ms）",
+            "25 帧/秒（40ms）", "30 帧/秒（33ms）"
         )
         val values = intArrayOf(
             SettingsManager.FPS_1, SettingsManager.FPS_2, SettingsManager.FPS_5,
-            SettingsManager.FPS_7_5, SettingsManager.FPS_10
+            SettingsManager.FPS_7_5, SettingsManager.FPS_10,
+            SettingsManager.FPS_15, SettingsManager.FPS_20,
+            SettingsManager.FPS_25, SettingsManager.FPS_30
         )
         var checked = values.indexOf(SettingsManager.getFps(this))
         if (checked < 0) checked = 2

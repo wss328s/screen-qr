@@ -22,6 +22,10 @@ object SettingsManager {
     const val FPS_5 = 5   // 200ms
     const val FPS_7_5 = 7 // 133ms (7.5帧/秒)
     const val FPS_10 = 10 // 100ms
+    const val FPS_15 = 15 // 66ms
+    const val FPS_20 = 20 // 50ms
+    const val FPS_25 = 25 // 40ms
+    const val FPS_30 = 30 // 33ms
     const val DEFAULT_FPS = FPS_5
 
     // 去重窗口（秒）
