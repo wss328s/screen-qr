@@ -11,7 +11,6 @@
         android:orientation="vertical"
         android:padding="20dp">
 
-        <!-- 标题 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -22,6 +21,59 @@
             android:layout_marginTop="12dp"
             android:layout_marginBottom="20dp"/>
 
+        <!-- 分组：权限 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="权限"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- 悬浮窗权限 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/overlayPermCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="悬浮窗权限"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/overlayPermValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未授予"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:layout_marginTop="6dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="点击申请悬浮窗权限，用于在其他应用上显示结果"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginTop="6dp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- 分组：识别参数 -->
         <TextView
             android:layout_width="wrap_content"
@@ -30,9 +82,10 @@
             android:textColor="@color/accent"
             android:textSize="14sp"
             android:layout_marginStart="4dp"
+            android:layout_marginTop="10dp"
             android:layout_marginBottom="8dp"/>
 
-        <!-- 识别频率卡片 -->
+        <!-- 识别频率 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/fpsCard"
             android:layout_width="match_parent"
@@ -75,7 +128,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 去重窗口卡片 -->
+        <!-- 去重 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/dedupCard"
             android:layout_width="match_parent"
@@ -118,7 +171,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 识别增强卡片 -->
+        <!-- 增强 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/enhanceCard"
             android:layout_width="match_parent"
@@ -130,7 +183,7 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+            android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:padding="20dp">
 
@@ -161,7 +214,7 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分析精度卡片 -->
+        <!-- 精度 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/scaleCard"
             android:layout_width="match_parent"
@@ -204,17 +257,17 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：显示与反馈 -->
+        <!-- 分组：悬浮窗外观 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="显示与反馈"
+            android:text="悬浮窗外观"
             android:textColor="@color/accent"
             android:textSize="14sp"
             android:layout_marginStart="4dp"
             android:layout_marginBottom="8dp"/>
 
-        <!-- 悬浮窗卡片 -->
+        <!-- 悬浮窗开关 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/floatCard"
             android:layout_width="match_parent"
@@ -262,7 +315,103 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 震动卡片 -->
+        <!-- 悬浮窗样式 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/floatStyleCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="悬浮窗样式"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/floatStyleValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="深色"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:layout_marginTop="6dp"/>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="深色 / 浅色 / 透明"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:layout_marginTop="6dp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 透明度 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/floatAlphaCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="@color/card_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            android:layout_marginBottom="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="悬浮窗透明度"
+                    android:textColor="@color/white"
+                    android:textSize="17sp"
+                    android:textStyle="bold"/>
+
+                <TextView
+                    android:id="@+id/floatAlphaValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100%"
+                    android:textColor="@color/accent"
+                    android:textSize="14sp"
+                    android:layout_marginTop="6dp"/>
+
+                <SeekBar
+                    android:id="@+id/floatAlphaSeek"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="100"
+                    android:layout_marginTop="10dp"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 分组：反馈 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="反馈"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="8dp"/>
+
+        <!-- 震动 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/vibrateCard"
             android:layout_width="match_parent"
@@ -310,22 +459,39 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 音效说明 -->
+        <!-- 分组：设备信息 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="设备信息"
+            android:textColor="@color/accent"
+            android:textSize="14sp"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="8dp"/>
+
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/deviceCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="@color/dark_surface"
+            app:cardBackgroundColor="@color/card_bg"
             app:cardCornerRadius="16dp"
             app:cardElevation="0dp"
             android:layout_marginBottom="24dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="识别成功时自动播放音效 + 震动反馈"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:padding="16dp"/>
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/deviceInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="6dp"/>
+            </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
