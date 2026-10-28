@@ -146,12 +146,14 @@ object FloatingResultManager {
         }
 
         // 播放音效（SoundPool，更快）
-        try {
-            initSound(ctx)
-            if (beepId != 0) {
-                soundPool?.play(beepId, 1f, 1f, 1, 0, 1f)
+        if (SettingsManager.getSound(ctx)) {
+            try {
+                initSound(ctx)
+                if (beepId != 0) {
+                    soundPool?.play(beepId, 1f, 1f, 1, 0, 1f)
+                }
+            } catch (e: Exception) {
             }
-        } catch (e: Exception) {
         }
     }
 

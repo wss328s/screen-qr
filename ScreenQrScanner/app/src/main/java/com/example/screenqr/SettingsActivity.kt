@@ -26,6 +26,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var vibrateValue: TextView
     private lateinit var floatSwitch: MaterialSwitch
     private lateinit var vibrateSwitch: MaterialSwitch
+    private lateinit var soundSwitch: MaterialSwitch
+    private lateinit var soundValue: TextView
     private lateinit var deviceInfo: TextView
 
     companion object {
@@ -47,6 +49,8 @@ class SettingsActivity : AppCompatActivity() {
         vibrateValue = findViewById(R.id.vibrateValue)
         floatSwitch = findViewById(R.id.floatSwitch)
         vibrateSwitch = findViewById(R.id.vibrateSwitch)
+        soundSwitch = findViewById(R.id.soundSwitch)
+        soundValue = findViewById(R.id.soundValue)
         deviceInfo = findViewById(R.id.deviceInfo)
 
         // 悬浮窗权限申请
@@ -84,6 +88,11 @@ class SettingsActivity : AppCompatActivity() {
         vibrateSwitch.setOnCheckedChangeListener { _, checked ->
             SettingsManager.setVibrate(this, checked)
             vibrateValue.text = if (checked) "已开启" else "已关闭"
+        }
+
+        soundSwitch.setOnCheckedChangeListener { _, checked ->
+            SettingsManager.setSound(this, checked)
+            soundValue.text = if (checked) "已开启" else "已关闭"
         }
 
         refreshTexts()
@@ -155,6 +164,11 @@ class SettingsActivity : AppCompatActivity() {
         val vibrateOn = SettingsManager.getVibrate(this)
         vibrateSwitch.isChecked = vibrateOn
         vibrateValue.text = if (vibrateOn) "已开启" else "已关闭"
+
+        // 音效
+        val soundOn = SettingsManager.getSound(this)
+        soundSwitch.isChecked = soundOn
+        soundValue.text = if (soundOn) "已开启" else "已关闭"
 
         // 设备信息
         deviceInfo.text = buildDeviceInfo()

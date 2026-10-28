@@ -198,10 +198,21 @@ class QrScanService : Service() {
             scaled.recycle()
 
             if (result != null) {
-                if (ScanHistory.add(result.text)) {
+                // 加到历史：同一内容在重置前只保留一次
+                val isNew = ScanHistory.add(result.text)
+
+                // 反馈：按去重窗口判断（音效/震动）
+                val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
+
+                if (isNew) {
                     qrCount++
                     found = true
+                    // 新内容才更新悬浮窗
                     FloatingResultManager.update(this)
+                }
+
+                if (shouldNotify) {
+                    // 反馈（音效/震动）
                     FloatingResultManager.notifyRead(this)
                 }
             }

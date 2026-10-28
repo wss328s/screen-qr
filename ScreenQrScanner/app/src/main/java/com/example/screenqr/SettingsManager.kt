@@ -51,6 +51,10 @@ object SettingsManager {
     const val KEY_VIBRATE = "vibrate"
     const val DEFAULT_VIBRATE = true
 
+    // 音效开关
+    const val KEY_SOUND = "sound"
+    const val DEFAULT_SOUND = true
+
     // 悬浮窗透明度（0-100）
     const val KEY_FLOAT_ALPHA = "float_alpha"
     const val DEFAULT_FLOAT_ALPHA = 100
@@ -86,6 +90,9 @@ object SettingsManager {
 
     fun getVibrate(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_VIBRATE, DEFAULT_VIBRATE)
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()
+
+    fun getSound(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_SOUND, DEFAULT_SOUND)
+    fun setSound(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_SOUND, v).apply()
 
     fun getFloatAlpha(ctx: Context): Int = prefs(ctx).getInt(KEY_FLOAT_ALPHA, DEFAULT_FLOAT_ALPHA)
     fun setFloatAlpha(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FLOAT_ALPHA, v).apply()
