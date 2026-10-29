@@ -17,11 +17,21 @@ object ScanHistory {
     // 最近反馈过的内容（按去重窗口过期）
     private val recentNotify = LinkedHashMap<String, Long>()
 
+    // 正在联网解析的活码数量
+    private var liveLoadingCount = 0
+
     fun reset() {
         items.clear()
         historySet.clear()
         recentNotify.clear()
+        liveLoadingCount = 0
     }
+
+    @Synchronized
+    fun beginLive() { liveLoadingCount++ }
+
+    @Synchronized
+    fun endLive() { liveLoadingCount = maxOf(0, liveLoadingCount - 1) }
 
     /**
      * 加到历史：同一内容在重置前只加一次。
@@ -61,10 +71,13 @@ object ScanHistory {
     }
 
     fun statusText(): String {
-        if (items.isEmpty()) return "等待扫码..."
+        if (items.isEmpty() && liveLoadingCount == 0) return "等待扫码..."
         val sb = StringBuilder()
         items.forEachIndexed { i, content ->
             sb.append("第${i+1}个: $content\n")
+        }
+        if (liveLoadingCount > 0) {
+            sb.append("正在获取网络内容…")
         }
         return sb.toString().trimEnd()
     }

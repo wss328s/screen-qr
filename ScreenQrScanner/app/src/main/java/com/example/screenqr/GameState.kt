@@ -27,13 +27,20 @@ object GameState {
         private set
     // 永久去重：重置前同一码只记录一次
     private val seenCodes = mutableSetOf<String>()
+    // 正在联网解析的活码数量（loading 提示）
+    var liveLoadingCount = 0
+        private set
 
     fun reset() {
         legs.forEach { it.codes.clear() }
         currentLegIndex = 0
         totalRead = 0
         seenCodes.clear()
+        liveLoadingCount = 0
     }
+
+    fun beginLive() { liveLoadingCount++ }
+    fun endLive() { if (liveLoadingCount > 0) liveLoadingCount-- }
 
     fun parseAndRecord(raw: String): Boolean {
         val s = raw.trim()
@@ -70,6 +77,9 @@ object GameState {
             if (l.isComplete) {
                 sb.append("\n岔路${i+1}: ${l.codes.joinToString(" ")} → 走第${l.recommendedIndex()!!+1}个(${l.recommendedValue()})")
             }
+        }
+        if (liveLoadingCount > 0) {
+            sb.append("\n正在获取网络内容…")
         }
         return sb.toString()
     }

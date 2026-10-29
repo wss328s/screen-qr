@@ -77,6 +77,10 @@ object SettingsManager {
     const val KEY_SOUND = "sound"
     const val DEFAULT_SOUND = true
 
+    // 活码（网络二维码）解析：扫到草料等活码时联网读取后台真实内容
+    const val KEY_LIVE = "live_code"
+    const val DEFAULT_LIVE = true
+
     // 悬浮窗透明度（0-100）
     const val KEY_FLOAT_ALPHA = "float_alpha"
     const val DEFAULT_FLOAT_ALPHA = 100
@@ -132,6 +136,9 @@ object SettingsManager {
 
     fun getSound(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_SOUND, DEFAULT_SOUND)
     fun setSound(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_SOUND, v).apply()
+
+    fun getLiveCode(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_LIVE, DEFAULT_LIVE)
+    fun setLiveCode(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_LIVE, v).apply()
 
     fun getFloatAlpha(ctx: Context): Int = prefs(ctx).getInt(KEY_FLOAT_ALPHA, DEFAULT_FLOAT_ALPHA)
     fun setFloatAlpha(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FLOAT_ALPHA, v).apply()

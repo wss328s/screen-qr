@@ -70,6 +70,11 @@ class QrScanService : Service() {
     // 上次实际提取/解码的时间（速率门，-1=尚未派发）
     private var lastDispatchAt = -1L
 
+    // 活码网络请求线程池（独立于扫描线程，联网等待不阻塞扫码）
+    private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+    // 正在联网解析的活码URL（避免重复请求）
+    private val pendingLive = HashSet<String>()
+
     private var screenW = 0
     private var screenH = 0
     private var density = 0
@@ -250,30 +255,89 @@ class QrScanService : Service() {
         }
     }
 
-    /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈 */
+    /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈（含活码联网解析） */
     private fun processResult(result: QrDecoder.DecodeResult) {
         if (workMode == SettingsManager.MODE_GAME) {
             // 比赛导航模式
-            val isNew = GameState.parseAndRecord(result.text)
-            if (isNew) {
-                qrCount++
-                mainHandler.post {
-                    FloatingResultManager.update(this)
-                    FloatingResultManager.notifyRead(this)
+            val raw = result.text
+            if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
+                // 活码：联网解析真实内容，再从真实内容提取数字（短链本身没有有效数字）
+                val url = raw.trim()
+                val dup = synchronized(pendingLive) { pendingLive.contains(url) }
+                if (!dup) {
+                    synchronized(pendingLive) { pendingLive.add(url) }
+                    GameState.beginLive()
+                    mainHandler.post { FloatingResultManager.update(this) }
+                    liveExecutor.execute {
+                        val live = try { LiveCodeResolver.resolve(url) } catch (e: Exception) { null }
+                        synchronized(pendingLive) { pendingLive.remove(url) }
+                        GameState.endLive()
+                        // 解析失败：短链域名含数字（qr61→61），兜底会误记，直接丢弃不记录
+                        val content = live?.content?.trim()
+                        if (content.isNullOrBlank()) {
+                            mainHandler.post { FloatingResultManager.update(this) }
+                            return@execute
+                        }
+                        val isNew = GameState.parseAndRecord(content)
+                        if (isNew) qrCount++
+                        mainHandler.post {
+                            FloatingResultManager.update(this)
+                            if (isNew) FloatingResultManager.notifyRead(this)
+                        }
+                    }
+                }
+            } else {
+                // 普通码
+                val isNew = GameState.parseAndRecord(raw)
+                if (isNew) {
+                    qrCount++
+                    mainHandler.post {
+                        FloatingResultManager.update(this)
+                        FloatingResultManager.notifyRead(this)
+                    }
                 }
             }
         } else {
             // 纯扫码模式
-            val isNew = ScanHistory.add(result.text)
-            val shouldNotify = ScanHistory.shouldNotify(result.text, dedupTtlMs)
+            val raw = result.text
+            if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
+                // 活码（网络二维码）：独立线程联网读取后台真实内容
+                val url = raw.trim()
+                val dup = synchronized(pendingLive) { pendingLive.contains(url) }
+                if (!dup) {
+                    synchronized(pendingLive) { pendingLive.add(url) }
+                    ScanHistory.beginLive()
+                    mainHandler.post { FloatingResultManager.update(this) }
+                    liveExecutor.execute {
+                        val live = try {
+                            LiveCodeResolver.resolve(url)
+                        } catch (e: Exception) { null }
+                        synchronized(pendingLive) { pendingLive.remove(url) }
+                        ScanHistory.endLive()
+                        // 成功显示真实内容，失败兜底显示原始链接
+                        val display = live?.content ?: url
+                        val isNew = ScanHistory.add(display)
+                        if (isNew) qrCount++
+                        val shouldNotify = ScanHistory.shouldNotify(display, dedupTtlMs)
+                        mainHandler.post {
+                            FloatingResultManager.update(this)
+                            if (shouldNotify) FloatingResultManager.notifyRead(this)
+                        }
+                    }
+                }
+            } else {
+                // 普通码
+                val isNew = ScanHistory.add(raw)
+                val shouldNotify = ScanHistory.shouldNotify(raw, dedupTtlMs)
 
-            if (isNew) {
-                qrCount++
-                mainHandler.post { FloatingResultManager.update(this) }
-            }
+                if (isNew) {
+                    qrCount++
+                    mainHandler.post { FloatingResultManager.update(this) }
+                }
 
-            if (shouldNotify) {
-                mainHandler.post { FloatingResultManager.notifyRead(this) }
+                if (shouldNotify) {
+                    mainHandler.post { FloatingResultManager.notifyRead(this) }
+                }
             }
         }
     }
@@ -378,6 +442,7 @@ class QrScanService : Service() {
         try { imageReader?.close() } catch (_: Exception) {}
         try { mediaProjection?.stop() } catch (_: Exception) {}
         FloatingResultManager.hideAll(this)
+        try { liveExecutor.shutdownNow() } catch (_: Exception) {}
         workerThread.quitSafely()
         super.onDestroy()
     }
