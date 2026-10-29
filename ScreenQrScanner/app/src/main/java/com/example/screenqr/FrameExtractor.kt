@@ -10,8 +10,10 @@ import java.nio.ByteBuffer
  * - 不创建任何 Bitmap，不分配全屏内存；
  * - 只处理 ROI 内的像素，且只读一次；
  * - 源帧一次性 bulk 拷贝到堆内后做快速数组访问，避免逐像素 JNI 调用；
- * - 源/目标缓冲均复用，避免每帧分配（尤其 native 直接内存）；
  * - 输出 1 字节/像素的灰度，数据量是 RGBA 的 1/4。
+ *
+ * 缓冲管理：每个 GrayFrame 持有独立的直接缓冲，可安全跨线程传递；
+ * 用一个小对象池复用（解码完归还），稳态下几乎不分配 native 内存。
  */
 object FrameExtractor {
 
@@ -19,13 +21,40 @@ object FrameExtractor {
         val width: Int,
         val height: Int,
         val rowStride: Int,
-        val gray: ByteBuffer
+        val gray: ByteBuffer,
+        val capturedAt: Long
     )
 
     // 复用的源帧拷贝（堆内，避免逐像素 JNI 读取）
     private var srcCopy: ByteArray = ByteArray(0)
-    // 复用的输出灰度缓冲（直接内存，避免每帧分配 native 内存）
-    private var outBuf: ByteBuffer = ByteBuffer.allocateDirect(1)
+
+    // 空闲灰度直接缓冲池（容量可能大于实际需要，按最小可用复用）
+    private val pool = ArrayDeque<ByteBuffer>()
+    private const val MAX_POOL = 3
+
+    private fun acquireBuffer(need: Int): ByteBuffer {
+        synchronized(pool) {
+            var best: ByteBuffer? = null
+            for (b in pool) {
+                if (b.capacity() >= need && (best == null || b.capacity() < best!!.capacity())) {
+                    best = b
+                }
+            }
+            if (best != null) {
+                pool.remove(best)
+                best!!.clear()
+                return best
+            }
+        }
+        return ByteBuffer.allocateDirect(need)
+    }
+
+    /** 解码完成后归还帧缓冲，供后续帧复用 */
+    fun recycle(frame: GrayFrame) {
+        synchronized(pool) {
+            if (pool.size < MAX_POOL) pool.addLast(frame.gray)
+        }
+    }
 
     /**
      * @param buffer      截屏第一个平面（RGBA）的 ByteBuffer
@@ -42,7 +71,8 @@ object FrameExtractor {
         srcW: Int,
         srcH: Int,
         bounds: FloatArray,
-        maxDimension: Int
+        maxDimension: Int,
+        capturedAt: Long
     ): GrayFrame? {
         // ROI 像素矩形
         val l = (bounds[0] * srcW).toInt().coerceIn(0, srcW - 1)
@@ -71,11 +101,9 @@ object FrameExtractor {
         val n = buffer.remaining()
         buffer.get(srcCopy, 0, n)
 
-        // 2) 确保输出直接缓冲足够（复用，避免每帧分配 native 内存）
+        // 2) 从池取（或新建）独立输出缓冲
         val outNeeded = outW * outH
-        if (outBuf.capacity() < outNeeded) {
-            outBuf = ByteBuffer.allocateDirect(outNeeded)
-        }
+        val outBuf = acquireBuffer(outNeeded)
 
         // 3) 单遍 裁剪 + 降采样 + 转灰度
         for (oy in 0 until outH) {
@@ -97,6 +125,6 @@ object FrameExtractor {
         }
         outBuf.limit(outNeeded)
         outBuf.rewind()
-        return GrayFrame(outW, outH, outW, outBuf)
+        return GrayFrame(outW, outH, outW, outBuf, capturedAt)
     }
 }

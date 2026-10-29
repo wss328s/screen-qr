@@ -22,7 +22,13 @@ import android.util.DisplayMetrics
 import android.view.WindowManager
 
 /**
- * 前台服务：持续截屏 -> ZXing 识别 -> 悬浮窗弹出结果。
+ * 前台服务：持续截屏 -> 灰度提取 -> native 识别 -> 悬浮窗弹出结果。
+ *
+ * 管线（线程解耦）：
+ * - QrScanWorker：帧回调，做廉价运动采样、速率门、ROI 灰度提取、纯色/黑屏门控，
+ *   只把"最新一帧"发布给解码线程（采集永不被解码阻塞）；
+ * - QrDecoder：单线程 native 解码，只处理最新帧，过期/积压帧丢弃，结果回主线程更新UI；
+ * - 活码联网：独立线程池，等待网络不阻塞扫码。
  */
 class QrScanService : Service() {
 
@@ -37,6 +43,8 @@ class QrScanService : Service() {
 
         // 识别解码的最大宽度（保护上限，QR识别不需要更高）
         private const val MAX_DECODE_WIDTH = 1920
+        // 待解码帧的最大年龄：超过则视为积压过期，丢弃（保证低延迟）
+        private const val MAX_FRAME_AGE_MS = 500L
 
         @Volatile
         var isRunning = false
@@ -57,9 +65,18 @@ class QrScanService : Service() {
     // 主线程handler：用于更新悬浮窗、通知
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // 后台线程：所有截屏+识别重计算都在这里，避免阻塞主线程ANR
+    // 采集线程：运动采样 + 灰度提取（轻量，不做native解码）
     private val workerThread = HandlerThread("QrScanWorker").apply { start() }
     private val scanHandler = Handler(workerThread.looper)
+
+    // 解码线程：native 重计算（与采集解耦，解码不阻塞运动检测）
+    private val decoderThread = HandlerThread("QrDecoder").apply { start() }
+    private val decoderHandler = Handler(decoderThread.looper)
+
+    // 最新待解码帧（单槽，只保留最新）+ 单飞标志
+    private val frameLock = Any()
+    private var latestFrame: FrameExtractor.GrayFrame? = null
+    private val decodeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // 活码网络请求线程池（独立于扫描线程，联网等待不阻塞扫码）
     private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
@@ -70,7 +87,7 @@ class QrScanService : Service() {
     private var burstUntilElapsed = 0L
     // 上一帧的灰度抽样（用于廉价运动检测）
     private var lastSample: ByteArray? = null
-    // 上次实际提取/解码的时间（速率门，-1=尚未派发）
+    // 上次实际提取的时间（速率门，-1=尚未派发）
     private var lastDispatchAt = -1L
 
     private var screenW = 0
@@ -190,7 +207,7 @@ class QrScanService : Service() {
         mainHandler.postDelayed(statusUpdateRunnable, 1000)
     }
 
-    /** 处理一帧：廉价运动采样 -> 速率门 -> ROI灰度提取 -> 纯色拒绝 -> native解码 */
+    /** 采集线程：廉价运动采样 -> 速率门 -> ROI灰度提取 -> 纯色拒绝 -> 发布最新帧（不解码） */
     private fun handleFrame(image: android.media.Image) {
         frameCount++
         try {
@@ -210,7 +227,7 @@ class QrScanService : Service() {
             // 2) 有效扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
             val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
 
-            // 3) 速率门：未到间隔则跳过（运动采样已做，开销极小），避免密集提取/解码
+            // 3) 速率门：未到间隔则跳过（运动采样已做，开销极小），避免密集提取
             if (!shouldDispatch(now, interval)) return
 
             // 4) ROI 单遍 裁剪 + 降采样 + 转灰度（不建 Bitmap）
@@ -218,74 +235,116 @@ class QrScanService : Service() {
             val maxDim = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
             val frame = FrameExtractor.extract(
                 srcBuffer, srcRowStride, pixelStride,
-                imgW, imgH, bounds, maxDim
+                imgW, imgH, bounds, maxDim, now
             ) ?: return
 
             // 5) 黑屏/纯色帧解码前拒绝（QR 码本身高对比，不会被误判）
-            if (isFrameFlat(frame.gray, frame.width, frame.height, frame.rowStride)) return
+            if (isFrameFlat(frame.gray, frame.width, frame.height, frame.rowStride)) {
+                FrameExtractor.recycle(frame)
+                return
+            }
 
-            // 6) native 一次解码（灰度直喂，最快）
-            frame.gray.rewind()
-            val result = QrDecoder.decode(
-                frame.gray, frame.rowStride, frame.width, frame.height, enhanceMode
-            )
+            // 6) 发布给解码线程（只保留最新帧，采集不被解码阻塞）
+            publishFrame(frame)
+        } catch (e: Exception) {
+        }
+    }
 
-            if (result != null) {
-                if (workMode == SettingsManager.MODE_GAME) {
-                    // 比赛导航模式
-                    val isNew = GameState.parseAndRecord(result.text)
-                    if (isNew) {
-                        qrCount++
+    /** 发布最新帧：覆盖待解码槽（旧帧回收），若解码空闲则启动解码循环 */
+    private fun publishFrame(frame: FrameExtractor.GrayFrame) {
+        synchronized(frameLock) {
+            val old = latestFrame
+            latestFrame = frame
+            if (old != null) FrameExtractor.recycle(old)
+        }
+        if (decodeInFlight.compareAndSet(false, true)) {
+            decoderHandler.post { decodeLoop() }
+        }
+    }
+
+    /** 解码线程：循环取最新帧，过期丢弃，native 解码并处理结果，结束后回收 */
+    private fun decodeLoop() {
+        while (true) {
+            val frame = synchronized(frameLock) {
+                val f = latestFrame
+                latestFrame = null
+                f
+            }
+            if (frame == null) break
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - frame.capturedAt <= MAX_FRAME_AGE_MS) {
+                processFrame(frame)
+            }
+            FrameExtractor.recycle(frame)
+        }
+        decodeInFlight.set(false)
+        // 二次检查：防止"解码空闲检查"与"发布"之间的竞态漏帧
+        val missed = synchronized(frameLock) { latestFrame != null }
+        if (missed && decodeInFlight.compareAndSet(false, true)) {
+            decoderHandler.post { decodeLoop() }
+        }
+    }
+
+    /** native 解码 + 结果处理（比赛/纯扫码/活码） */
+    private fun processFrame(frame: FrameExtractor.GrayFrame) {
+        frame.gray.rewind()
+        val result = QrDecoder.decode(
+            frame.gray, frame.rowStride, frame.width, frame.height, enhanceMode
+        )
+        if (result == null) return
+
+        if (workMode == SettingsManager.MODE_GAME) {
+            // 比赛导航模式
+            val isNew = GameState.parseAndRecord(result.text)
+            if (isNew) {
+                qrCount++
+                mainHandler.post {
+                    FloatingResultManager.update(this)
+                    FloatingResultManager.notifyRead(this)
+                }
+            }
+        } else {
+            // 纯扫码模式
+            val raw = result.text
+            if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
+                // 活码（网络二维码）：独立线程联网读取后台真实内容
+                val url = raw.trim()
+                val dup = synchronized(pendingLive) { pendingLive.contains(url) }
+                if (!dup) {
+                    synchronized(pendingLive) { pendingLive.add(url) }
+                    ScanHistory.beginLive()
+                    mainHandler.post { FloatingResultManager.update(this) }
+                    liveExecutor.execute {
+                        val live = try {
+                            LiveCodeResolver.resolve(url)
+                        } catch (e: Exception) { null }
+                        synchronized(pendingLive) { pendingLive.remove(url) }
+                        ScanHistory.endLive()
+                        // 成功显示真实内容，失败兜底显示原始链接
+                        val display = live?.content ?: url
+                        val isNew = ScanHistory.add(display)
+                        if (isNew) qrCount++
+                        val shouldNotify = ScanHistory.shouldNotify(display, dedupTtlMs)
                         mainHandler.post {
                             FloatingResultManager.update(this)
-                            FloatingResultManager.notifyRead(this)
-                        }
-                    }
-                } else {
-                    // 纯扫码模式
-                    val raw = result.text
-                    if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
-                        // 活码（网络二维码）：独立线程联网读取后台真实内容
-                        val url = raw.trim()
-                        val dup = synchronized(pendingLive) { pendingLive.contains(url) }
-                        if (!dup) {
-                            synchronized(pendingLive) { pendingLive.add(url) }
-                            ScanHistory.beginLive()
-                            mainHandler.post { FloatingResultManager.update(this) }
-                            liveExecutor.execute {
-                                val live = try {
-                                    LiveCodeResolver.resolve(url)
-                                } catch (e: Exception) { null }
-                                synchronized(pendingLive) { pendingLive.remove(url) }
-                                ScanHistory.endLive()
-                                // 成功显示真实内容，失败兜底显示原始链接
-                                val display = live?.content ?: url
-                                val isNew = ScanHistory.add(display)
-                                if (isNew) qrCount++
-                                val shouldNotify = ScanHistory.shouldNotify(display, dedupTtlMs)
-                                mainHandler.post {
-                                    FloatingResultManager.update(this)
-                                    if (shouldNotify) FloatingResultManager.notifyRead(this)
-                                }
-                            }
-                        }
-                    } else {
-                        // 普通码
-                        val isNew = ScanHistory.add(raw)
-                        val shouldNotify = ScanHistory.shouldNotify(raw, dedupTtlMs)
-
-                        if (isNew) {
-                            qrCount++
-                            mainHandler.post { FloatingResultManager.update(this) }
-                        }
-
-                        if (shouldNotify) {
-                            mainHandler.post { FloatingResultManager.notifyRead(this) }
+                            if (shouldNotify) FloatingResultManager.notifyRead(this)
                         }
                     }
                 }
+            } else {
+                // 普通码
+                val isNew = ScanHistory.add(raw)
+                val shouldNotify = ScanHistory.shouldNotify(raw, dedupTtlMs)
+
+                if (isNew) {
+                    qrCount++
+                    mainHandler.post { FloatingResultManager.update(this) }
+                }
+
+                if (shouldNotify) {
+                    mainHandler.post { FloatingResultManager.notifyRead(this) }
+                }
             }
-        } catch (e: Exception) {
         }
     }
 
@@ -390,7 +449,14 @@ class QrScanService : Service() {
         try { mediaProjection?.stop() } catch (_: Exception) {}
         FloatingResultManager.hideAll(this)
         try { liveExecutor.shutdownNow() } catch (_: Exception) {}
+        try {
+            synchronized(frameLock) {
+                latestFrame?.let { FrameExtractor.recycle(it) }
+                latestFrame = null
+            }
+        } catch (_: Exception) {}
         workerThread.quitSafely()
+        decoderThread.quitSafely()
         super.onDestroy()
     }
 }
