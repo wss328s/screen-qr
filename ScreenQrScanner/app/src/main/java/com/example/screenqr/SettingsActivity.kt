@@ -32,6 +32,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var soundValue: TextView
     private lateinit var liveCodeSwitch: MaterialSwitch
     private lateinit var liveCodeValue: TextView
+    private lateinit var bootSwitch: MaterialSwitch
+    private lateinit var bootValue: TextView
     private lateinit var deviceInfo: TextView
 
     companion object {
@@ -59,6 +61,8 @@ class SettingsActivity : AppCompatActivity() {
         soundValue = findViewById(R.id.soundValue)
         liveCodeSwitch = findViewById(R.id.liveCodeSwitch)
         liveCodeValue = findViewById(R.id.liveCodeValue)
+        bootSwitch = findViewById(R.id.bootSwitch)
+        bootValue = findViewById(R.id.bootValue)
         deviceInfo = findViewById(R.id.deviceInfo)
 
         // 悬浮窗权限申请
@@ -108,6 +112,11 @@ class SettingsActivity : AppCompatActivity() {
         liveCodeSwitch.setOnCheckedChangeListener { _, checked ->
             SettingsManager.setLiveCode(this, checked)
             liveCodeValue.text = if (checked) "已开启" else "已关闭"
+        }
+
+        bootSwitch.setOnCheckedChangeListener { _, checked ->
+            SettingsManager.setBoot(this, checked)
+            bootValue.text = if (checked) "已开启" else "已关闭"
         }
 
         refreshTexts()
@@ -205,6 +214,11 @@ class SettingsActivity : AppCompatActivity() {
         val liveOn = SettingsManager.getLiveCode(this)
         liveCodeSwitch.isChecked = liveOn
         liveCodeValue.text = if (liveOn) "已开启" else "已关闭"
+
+        // 开机自启
+        val bootOn = SettingsManager.getBoot(this)
+        bootSwitch.isChecked = bootOn
+        bootValue.text = if (bootOn) "已开启" else "已关闭"
 
         // 设备信息
         deviceInfo.text = buildDeviceInfo()

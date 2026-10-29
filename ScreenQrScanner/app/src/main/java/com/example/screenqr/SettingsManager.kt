@@ -77,6 +77,10 @@ object SettingsManager {
     const val KEY_LIVE = "live_code"
     const val DEFAULT_LIVE = true
 
+    // 开机自启开关
+    const val KEY_BOOT = "boot_auto_start"
+    const val DEFAULT_BOOT = true
+
     // 悬浮窗透明度（0-100）
     const val KEY_FLOAT_ALPHA = "float_alpha"
     const val DEFAULT_FLOAT_ALPHA = 100
@@ -132,6 +136,9 @@ object SettingsManager {
 
     fun getLiveCode(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_LIVE, DEFAULT_LIVE)
     fun setLiveCode(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_LIVE, v).apply()
+
+    fun getBoot(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_BOOT, DEFAULT_BOOT)
+    fun setBoot(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_BOOT, v).apply()
 
     fun getFloatAlpha(ctx: Context): Int = prefs(ctx).getInt(KEY_FLOAT_ALPHA, DEFAULT_FLOAT_ALPHA)
     fun setFloatAlpha(ctx: Context, v: Int) = prefs(ctx).edit().putInt(KEY_FLOAT_ALPHA, v).apply()
