@@ -308,8 +308,12 @@ class QrScanService : Service() {
                         val live = try { LiveCodeResolver.resolve(url) } catch (e: Exception) { null }
                         synchronized(pendingLive) { pendingLive.remove(url) }
                         GameState.endLive()
-                        // 成功用真实内容，失败兜底用原始短链
-                        val content = live?.content ?: url
+                        // 解析失败：短链域名含数字（qr61→61），兜底会误记，直接丢弃不记录
+                        val content = live?.content?.trim()
+                        if (content.isNullOrBlank()) {
+                            mainHandler.post { FloatingResultManager.update(this) }
+                            return@execute
+                        }
                         val isNew = GameState.parseAndRecord(content)
                         if (isNew) qrCount++
                         mainHandler.post {
