@@ -295,12 +295,38 @@ class QrScanService : Service() {
 
         if (workMode == SettingsManager.MODE_GAME) {
             // 比赛导航模式
-            val isNew = GameState.parseAndRecord(result.text)
-            if (isNew) {
-                qrCount++
-                mainHandler.post {
-                    FloatingResultManager.update(this)
-                    FloatingResultManager.notifyRead(this)
+            val raw = result.text
+            if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
+                // 活码：联网解析真实内容，再从真实内容提取数字（短链本身没有有效数字）
+                val url = raw.trim()
+                val dup = synchronized(pendingLive) { pendingLive.contains(url) }
+                if (!dup) {
+                    synchronized(pendingLive) { pendingLive.add(url) }
+                    GameState.beginLive()
+                    mainHandler.post { FloatingResultManager.update(this) }
+                    liveExecutor.execute {
+                        val live = try { LiveCodeResolver.resolve(url) } catch (e: Exception) { null }
+                        synchronized(pendingLive) { pendingLive.remove(url) }
+                        GameState.endLive()
+                        // 成功用真实内容，失败兜底用原始短链
+                        val content = live?.content ?: url
+                        val isNew = GameState.parseAndRecord(content)
+                        if (isNew) qrCount++
+                        mainHandler.post {
+                            FloatingResultManager.update(this)
+                            if (isNew) FloatingResultManager.notifyRead(this)
+                        }
+                    }
+                }
+            } else {
+                // 普通码
+                val isNew = GameState.parseAndRecord(raw)
+                if (isNew) {
+                    qrCount++
+                    mainHandler.post {
+                        FloatingResultManager.update(this)
+                        FloatingResultManager.notifyRead(this)
+                    }
                 }
             }
         } else {
