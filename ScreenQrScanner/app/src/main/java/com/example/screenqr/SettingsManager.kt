@@ -65,6 +65,10 @@ object SettingsManager {
     const val KEY_FLOAT = "float"
     const val DEFAULT_FLOAT = true
 
+    // 开机自启开关
+    const val KEY_BOOT = "boot_auto_start"
+    const val DEFAULT_BOOT = true
+
     // 震动开关
     const val KEY_VIBRATE = "vibrate"
     const val DEFAULT_VIBRATE = true
@@ -119,6 +123,9 @@ object SettingsManager {
 
     fun getFloat(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_FLOAT, DEFAULT_FLOAT)
     fun setFloat(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_FLOAT, v).apply()
+
+    fun getBoot(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_BOOT, DEFAULT_BOOT)
+    fun setBoot(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_BOOT, v).apply()
 
     fun getVibrate(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_VIBRATE, DEFAULT_VIBRATE)
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()

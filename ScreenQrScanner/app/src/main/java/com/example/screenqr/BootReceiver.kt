@@ -16,6 +16,9 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
+        // 未开启开机自启则不处理
+        if (!SettingsManager.getBoot(context)) return
+
         // 直接尝试打开MainActivity（打开后会自动请求权限）
         val openIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
