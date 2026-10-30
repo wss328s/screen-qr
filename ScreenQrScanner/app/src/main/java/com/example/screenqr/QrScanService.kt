@@ -1,4 +1,4 @@
-package com.example.screenqr
+﻿package com.example.screenqr
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -22,7 +22,7 @@ import android.util.DisplayMetrics
 import android.view.WindowManager
 
 /**
- * 前台服务：持续截屏 -> ZXing 识别 -> 悬浮窗弹出结果。
+ * 鍓嶅彴鏈嶅姟锛氭寔缁埅灞?-> ZXing 璇嗗埆 -> 鎮诞绐楀脊鍑虹粨鏋溿€?
  */
 class QrScanService : Service() {
 
@@ -36,63 +36,69 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        // 全图增强档的最大宽度（保护上限，QR识别不需要更高）
+        // 鍏ㄥ浘澧炲己妗ｇ殑鏈€澶у搴︼紙淇濇姢涓婇檺锛孮R璇嗗埆涓嶉渶瑕佹洿楂橈級
         private const val MAX_DECODE_WIDTH = 1920
-        // 快速档目标宽度：小图先跑，像素少→快；清晰码在此命中
+        // 蹇€熸。鐩爣瀹藉害锛氬皬鍥惧厛璺戯紝鍍忕礌灏戔啋蹇紱娓呮櫚鐮佸湪姝ゅ懡涓?
         private const val FAST_DECODE_WIDTH = 720
 
-        // ===== 图传场景专用解码参数（基于真实素材实测确定）=====
-        // 基准宽度：先把画面统一缩放到这个宽度，再按倍率放大解码。
-        // 实测 1180px 基准 + 2x 放大时，远处小码命中率最优，单帧约 7~21ms。
-        private const val BASE_DECODE_WIDTH = 1180
-        // 级联放大倍率：2x 优先（最快、命中率最高），未中再 3x（拯救更小的码）
-        private const val SCALE_FIRST = 2
-        private const val SCALE_SECOND = 3
+        // ===== 鍥句紶鍦烘櫙涓撶敤瑙ｇ爜鍙傛暟锛堝熀浜?3 娈电湡瀹炴棤浜烘満鍥句紶绱犳潗瀹炴祴纭畾锛?====
+        // 瀹炴祴缁撹锛氫簩缁寸爜鍦ㄧ敾闈笂浣嶇疆涓嶅浐瀹氾紙鍙兘璐村湪涓嬭竟缂橈級锛屼笖甯歌鍊炬枩/鍗锋洸/钃濆簳锛?
+        // 鍥犳蹇呴』**鍏ㄥ睆**瑙ｇ爜鑰岄潪鍥哄畾 ROI锛涘悓鏃跺繀椤绘斁澶э紝鍚﹀垯灏忕爜瀹屽叏瑙ｄ笉鍑恒€?
+        //
+        // 涓夌骇鍊嶇巼瀹炴祴锛坴1/v2/v3 涓夋绱犳潗锛屽叡 1566 甯э級锛?
+        //   3540px 鍛戒腑鏈€澶氾紙91%锛夈€?720px 娆′箣锛堟晳鏇村皬鐨勭爜锛夈€?360px 鍏滃ぇ鐮?
+        private const val DECODE_WIDTH_MAIN = 3540
+        private const val DECODE_WIDTH_SMALL = 4720
+        private const val DECODE_WIDTH_LARGE = 2360
+
+        /** 鍏ㄥ睆杈圭晫锛堝浘浼犵敾闈㈤噷鐮佺殑浣嶇疆涓嶅浐瀹氾紝蹇呴』鏁村睆鎵級 */
+        private val FULL_BOUNDS = floatArrayOf(0f, 0f, 1f, 1f)
 
         @Volatile
         var isRunning = false
             private set
     }
 
-    // 从设置读取参数
+    // 浠庤缃鍙栧弬鏁?
     private val workMode: Int get() = SettingsManager.getMode(this)
     private val scanIntervalMs: Long get() = SettingsManager.fpsToIntervalMs(SettingsManager.getFps(this))
     private val dedupTtlMs: Long get() = SettingsManager.getDedup(this).toLong() * 1000
-    private val scaleWidth: Int get() = SettingsManager.getScale(this)
     private val enhanceMode: Int get() = SettingsManager.getEnhance(this)
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var imageReader: ImageReader? = null
 
-    // 主线程handler：用于更新悬浮窗、通知
+    // 涓荤嚎绋媓andler锛氱敤浜庢洿鏂版偓娴獥銆侀€氱煡
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // 后台线程：所有截屏+识别重计算都在这里，避免阻塞主线程ANR
+    // 鍚庡彴绾跨▼锛氭墍鏈夋埅灞?璇嗗埆閲嶈绠楅兘鍦ㄨ繖閲岋紝閬垮厤闃诲涓荤嚎绋婣NR
     private val workerThread = HandlerThread("QrScanWorker").apply { start() }
     private val scanHandler = Handler(workerThread.looper)
 
-    // 运动触发突发：画面变化后，在该 elapsedRealtime 时间戳前以最快速度扫描（降低新码出现时的延迟）
+    // 杩愬姩瑙﹀彂绐佸彂锛氱敾闈㈠彉鍖栧悗锛屽湪璇?elapsedRealtime 鏃堕棿鎴冲墠浠ユ渶蹇€熷害鎵弿锛堥檷浣庢柊鐮佸嚭鐜版椂鐨勫欢杩燂級
     private var burstUntilElapsed = 0L
-    // 上一帧的灰度抽样（用于廉价运动检测）
+    // 涓婁竴甯х殑鐏板害鎶芥牱锛堢敤浜庡粔浠疯繍鍔ㄦ娴嬶級
     private var lastSample: ByteArray? = null
-    // 上次实际提取/解码的时间（速率门，-1=尚未派发）
+    // 涓婃瀹為檯鎻愬彇/瑙ｇ爜鐨勬椂闂达紙閫熺巼闂紝-1=灏氭湭娲惧彂锛?
     private var lastDispatchAt = -1L
+    // 涓婃瑙ｇ爜瀹為檯鑰楁椂锛堟绉掞級锛岀敤浜庤嚜閫傚簲闂撮殧锛岄伩鍏嶅抚绉帇
+    private var lastDecodeCostMs = 0L
 
-    // 活码网络请求线程池（独立于扫描线程，联网等待不阻塞扫码）
+    // 娲荤爜缃戠粶璇锋眰绾跨▼姹狅紙鐙珛浜庢壂鎻忕嚎绋嬶紝鑱旂綉绛夊緟涓嶉樆濉炴壂鐮侊級
     private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
-    // 正在联网解析的活码URL（避免重复请求）
+    // 姝ｅ湪鑱旂綉瑙ｆ瀽鐨勬椿鐮乁RL锛堥伩鍏嶉噸澶嶈姹傦級
     private val pendingLive = HashSet<String>()
-    // 活码 URL 最近一次触发解析的时间：冷却期内不重复解析，避免屏幕活码常驻时反复刷新
+    // 娲荤爜 URL 鏈€杩戜竴娆¤Е鍙戣В鏋愮殑鏃堕棿锛氬喎鍗存湡鍐呬笉閲嶅瑙ｆ瀽锛岄伩鍏嶅睆骞曟椿鐮佸父椹绘椂鍙嶅鍒锋柊
     private val liveLastResolvedAt = HashMap<String, Long>()
-    // 同一活码 URL 的解析冷却时长（避免屏上活码常驻时反复 loading；重置后 2 秒内同码不重复解析）
+    // 鍚屼竴娲荤爜 URL 鐨勮В鏋愬喎鍗存椂闀匡紙閬垮厤灞忎笂娲荤爜甯搁┗鏃跺弽澶?loading锛涢噸缃悗 2 绉掑唴鍚岀爜涓嶉噸澶嶈В鏋愶級
     private val LIVE_COOLDOWN_MS = 2000L
 
     private var screenW = 0
     private var screenH = 0
     private var density = 0
 
-    // 诊断计数（后台线程写、主线程读，用 @Volatile 保证可见性）
+    // 璇婃柇璁℃暟锛堝悗鍙扮嚎绋嬪啓銆佷富绾跨▼璇伙紝鐢?@Volatile 淇濊瘉鍙鎬э級
     @Volatile private var frameCount = 0
     @Volatile private var qrCount = 0
     private var startTimestamp = 0L
@@ -109,12 +115,12 @@ class QrScanService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        // Android 14+ 需要指定服务类型；低于 14 用兼容方式进入前台
+        // Android 14+ 闇€瑕佹寚瀹氭湇鍔＄被鍨嬶紱浣庝簬 14 鐢ㄥ吋瀹规柟寮忚繘鍏ュ墠鍙?
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"),
+            startForeground(NOTI_ID, buildNotification("鍚姩涓?..", "姝ｅ湪璇锋眰鎴睆鏉冮檺"),
                 android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         } else {
-            startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"))
+            startForeground(NOTI_ID, buildNotification("鍚姩涓?..", "姝ｅ湪璇锋眰鎴睆鏉冮檺"))
         }
     }
 
@@ -125,7 +131,7 @@ class QrScanService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
-                // 已在运行则忽略重复启动（防止重复注册 MediaProjection 回调/泄漏）
+                // 宸插湪杩愯鍒欏拷鐣ラ噸澶嶅惎鍔紙闃叉閲嶅娉ㄥ唽 MediaProjection 鍥炶皟/娉勬紡锛?
                 if (isRunning) return START_STICKY
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
                 val data: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -148,15 +154,15 @@ class QrScanService : Service() {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = mpm.getMediaProjection(resultCode, data)
         if (mediaProjection == null) {
-            updateStatusNotification("错误", "无法创建截屏投影，请重新授权")
+            updateStatusNotification("閿欒", "鏃犳硶鍒涘缓鎴睆鎶曞奖锛岃閲嶆柊鎺堟潈")
             stopSelf()
             return
         }
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
-                // 系统主动停止截屏：清理资源并结束服务，避免残留半启动状态
+                // 绯荤粺涓诲姩鍋滄鎴睆锛氭竻鐞嗚祫婧愬苟缁撴潫鏈嶅姟锛岄伩鍏嶆畫鐣欏崐鍚姩鐘舵€?
                 mainHandler.post {
-                    updateStatusNotification("已停止", "截屏已被系统或用户停止")
+                    updateStatusNotification("宸插仠姝?, "鎴睆宸茶绯荤粺鎴栫敤鎴峰仠姝?)
                     stopSelf()
                 }
             }
@@ -175,7 +181,7 @@ class QrScanService : Service() {
         qrCount = 0
 
         try {
-            // 事件驱动：一有新帧立即在后台线程处理（静止画面不产生帧，零开销）
+            // 浜嬩欢椹卞姩锛氫竴鏈夋柊甯х珛鍗冲湪鍚庡彴绾跨▼澶勭悊锛堥潤姝㈢敾闈笉浜х敓甯э紝闆跺紑閿€锛?
             imageReader = ImageReader.newInstance(screenW, screenH, PixelFormat.RGBA_8888, 2).apply {
                 setOnImageAvailableListener({ reader ->
                     val image = try { reader.acquireLatestImage() } catch (e: Exception) { null }
@@ -195,20 +201,20 @@ class QrScanService : Service() {
                 imageReader!!.surface, null, null
             )
             if (virtualDisplay == null) {
-                updateStatusNotification("错误", "VirtualDisplay 创建失败，系统不允许截屏")
+                updateStatusNotification("閿欒", "VirtualDisplay 鍒涘缓澶辫触锛岀郴缁熶笉鍏佽鎴睆")
                 cleanupCapture()
                 stopSelf()
                 return
             }
         } catch (e: Exception) {
-            updateStatusNotification("错误", "截屏初始化异常: ${e.message}")
-            // 初始化失败时清理已部分创建的资源，避免泄漏
+            updateStatusNotification("閿欒", "鎴睆鍒濆鍖栧紓甯? ${e.message}")
+            // 鍒濆鍖栧け璐ユ椂娓呯悊宸查儴鍒嗗垱寤虹殑璧勬簮锛岄伩鍏嶆硠婕?
             cleanupCapture()
             stopSelf()
             return
         }
 
-        // 重置，显示悬浮窗（根据模式）
+        // 閲嶇疆锛屾樉绀烘偓娴獥锛堟牴鎹ā寮忥級
         if (workMode == SettingsManager.MODE_GAME) {
             GameState.reset()
         } else {
@@ -218,13 +224,19 @@ class QrScanService : Service() {
 
         isRunning = true
         updateStatusNotification()
-        // 预加载音效
+        // 棰勫姞杞介煶鏁?
         FloatingResultManager.preloadSound(this)
-        // 帧处理由 ImageReader 事件驱动（后台线程）；状态通知在后台线程周期刷新
+        // 甯у鐞嗙敱 ImageReader 浜嬩欢椹卞姩锛堝悗鍙扮嚎绋嬶級锛涚姸鎬侀€氱煡鍦ㄥ悗鍙扮嚎绋嬪懆鏈熷埛鏂?
         mainHandler.postDelayed(statusUpdateRunnable, 1000)
     }
 
-    /** 处理一帧：运动采样 -> 速率门 -> 源帧拷贝 -> 小图快速档 -> (未中)全图重档 */
+    /**
+     * 澶勭悊涓€甯э細杩愬姩閲囨牱 -> 閫熺巼闂?-> 婧愬抚鎷疯礉 -> 澶氱骇鍊嶇巼绾ц仈瑙ｇ爜銆?
+     *
+     * 娉ㄦ剰锛氬浘浼犵敾闈㈡斁澶у埌 3540px 鍚庡崟甯цВ鐮佺害 30~40ms锛岃嫢鍥哄畾 33ms 闂撮殧浼氬鑷?
+     * 甯хН鍘嬨€佸欢杩熻秺鎷栬秺澶с€傚洜姝よ繖閲岀敤銆岃嚜閫傚簲闂撮殧銆嶏細浠ュ疄娴嬭€楁椂涓哄噯锛?
+     * 淇濊瘉瑙ｇ爜姘歌繙涓嶅爢绉紙瀹佸彲灏戣В鍑犲抚锛屼篃涓嶈寤惰繜绱Н锛夈€?
+     */
     private fun handleFrame(image: android.media.Image) {
         frameCount++
         try {
@@ -236,33 +248,39 @@ class QrScanService : Service() {
             val imgH = image.height
             val now = android.os.SystemClock.elapsedRealtime()
 
-            // 1) 廉价运动采样（256点），画面变化 -> 突发 1.5 秒
+            // 1) 寤変环杩愬姩閲囨牱锛?56鐐癸級锛岀敾闈㈠彉鍖?-> 绐佸彂 1.5 绉?
             if (sampleMotion(srcBuffer, srcRowStride, pixelStride, imgW, imgH)) {
                 burstUntilElapsed = now + 1500L
             }
 
-            // 2) 扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
-            val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
+            // 2) 鎵弿闂撮殧锛氱獊鍙戞湡灏介噺蹇紝浣嗕笉寰楀皬浜庝笂娆″疄闄呰В鐮佽€楁椂锛堥槻绉帇锛?
+            val userInterval = scanIntervalMs
+            val burstInterval = minOf(userInterval, 33L)
+            val adaptiveFloor = (lastDecodeCostMs * 1.1f).toLong().coerceAtLeast(33L)
+            val interval = if (now < burstUntilElapsed) maxOf(burstInterval, adaptiveFloor)
+                           else maxOf(userInterval, adaptiveFloor)
 
-            // 3) 速率门：未到间隔则跳过，避免密集提取/解码
+            // 3) 閫熺巼闂細鏈埌闂撮殧鍒欒烦杩囷紝閬垮厤瀵嗛泦鎻愬彇/瑙ｇ爜
             if (!shouldDispatch(now, interval)) return
 
-            // 4) 源帧一次性拷贝（各级解码复用，不重复拷全屏）
+            // 4) 婧愬抚涓€娆℃€ф嫹璐濓紙鍚勭骇瑙ｇ爜澶嶇敤锛屼笉閲嶅鎷峰叏灞忥級
             FrameExtractor.copySource(srcBuffer)
-            val bounds = SettingsManager.getRegionBounds(this)
+            val decodeStart = android.os.SystemClock.elapsedRealtime()
 
-            // ===== 图传场景解码级联（参数由真实素材实测确定）=====
-            // 关键：必须先放大再解码。实测缩到 720 宽时远处小码命中率仅 0.6%~6.7%，
-            // 放大 2~3 倍后提升到 10.5%~38%，这是能否识别出码的决定性因素。
+            // ===== 鍥句紶鍦烘櫙瑙ｇ爜绾ц仈锛堝弬鏁扮敱 3 娈电湡瀹炵礌鏉愬疄娴嬬‘瀹氾級=====
+            // 瀹炴祴锛氫簩缁寸爜浣嶇疆涓嶅浐瀹氾紙鍙兘璐寸敾闈笅杈圭紭锛夛紝鍥哄畾 ROI 浼氭妸鐮佽鎺変竴鍗婏紱
+            // 涓斿繀椤绘斁澶э紝鍚﹀垯杩滃灏忕爜瀹屽叏瑙ｄ笉鍑恒€傛晠姝ゅ鐢ㄥ叏灞?+ 澶氱骇鍊嶇巼銆?
+            // 鍏ㄥ睆杈圭晫 [0,0,1,1]
+            val full = FULL_BOUNDS
 
-            // 第 1 级：基准宽度 + 2x 放大（最快且命中率最高，约 7~21ms）
-            val scaled = buildScaledFrame(
-                srcRowStride, pixelStride, imgW, imgH, bounds, SCALE_FIRST, slot = 1
+            // 绗?1 绾э細鍏ㄥ睆 脳 3540锛堝疄娴?91% 鐨勫懡涓兘鍦ㄨ繖绾э紝绾?30-40ms锛?
+            val main = FrameExtractor.extractToWidth(
+                srcRowStride, pixelStride, imgW, imgH, full, DECODE_WIDTH_MAIN, slot = 1
             )
-            if (scaled != null && !isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) {
-                scaled.gray.rewind()
+            if (main != null && !isFrameFlat(main.gray, main.width, main.height, main.rowStride)) {
+                main.gray.rewind()
                 val hit = QrDecoder.decodeFast(
-                    scaled.gray, scaled.rowStride, scaled.width, scaled.height
+                    main.gray, main.rowStride, main.width, main.height
                 )
                 if (hit != null) {
                     processResult(hit)
@@ -270,77 +288,56 @@ class QrScanService : Service() {
                 }
             }
 
-            // 第 2 级：3x 放大（拯救更小的码；仅在突发期或增强开启时尝试，控制功耗）
+            // 绗?2 绾э細鍏ㄥ睆 脳 4720锛堟洿灏忕殑鐮侊紱绐佸彂鏈熸垨澧炲己寮€鍚椂灏濊瘯锛屾帶鍒跺姛鑰楋級
             val doSecond = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
             if (doSecond) {
-                val big = buildScaledFrame(
-                    srcRowStride, pixelStride, imgW, imgH, bounds, SCALE_SECOND, slot = 2
+                val small = FrameExtractor.extractToWidth(
+                    srcRowStride, pixelStride, imgW, imgH, full, DECODE_WIDTH_SMALL, slot = 2
                 )
-                if (big != null) {
-                    big.gray.rewind()
+                if (small != null) {
+                    small.gray.rewind()
                     val hit2 = QrDecoder.decodeHeavy(
-                        big.gray, big.rowStride, big.width, big.height, enhanceMode
+                        small.gray, small.rowStride, small.width, small.height, enhanceMode
                     )
                     if (hit2 != null) {
                         processResult(hit2)
                         return
                     }
                 }
-            }
 
-            // 第 3 级：原分辨率兜底（码很大、占屏很满时，放大反而破坏结构）
-            val native = FrameExtractor.extractToWidth(
-                srcRowStride, pixelStride, imgW, imgH, bounds,
-                if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH, slot = 3
-            )
-            if (native != null && !isFrameFlat(native.gray, native.width, native.height, native.rowStride)) {
-                native.gray.rewind()
-                val hit3 = QrDecoder.decodeHeavy(
-                    native.gray, native.rowStride, native.width, native.height, enhanceMode
+                // 绗?3 绾э細鍏ㄥ睆 脳 2360锛堜竴娆℃€у嚭鐜扮殑杈冨ぇ鐮侊級
+                val large = FrameExtractor.extractToWidth(
+                    srcRowStride, pixelStride, imgW, imgH, full, DECODE_WIDTH_LARGE, slot = 3
                 )
-                if (hit3 != null) {
-                    processResult(hit3)
-                    return
+                if (large != null) {
+                    large.gray.rewind()
+                    val hit3 = QrDecoder.decodeHeavy(
+                        large.gray, large.rowStride, large.width, large.height, enhanceMode
+                    )
+                    if (hit3 != null) {
+                        processResult(hit3)
+                        return
+                    }
                 }
             }
+
+            // 璁板綍鏈抚瑙ｇ爜鑰楁椂锛堟湭鍛戒腑璺緞锛夛紝渚涜嚜閫傚簲闂撮殧浣跨敤
+            lastDecodeCostMs = android.os.SystemClock.elapsedRealtime() - decodeStart
         } catch (e: Exception) {
-            // 单帧处理异常不应中断服务；记录到日志便于排查
+            // 鍗曞抚澶勭悊寮傚父涓嶅簲涓柇鏈嶅姟锛涜褰曞埌鏃ュ織渚夸簬鎺掓煡
             android.util.Log.w(TAG, "handleFrame error: ${e.message}")
         }
     }
 
-    /**
-     * 构建「基准宽度 × 放大倍率」的灰度帧。
-     *
-     * 先把 ROI 归一化到 [BASE_DECODE_WIDTH]，再乘以倍率得到最终的采样目标宽度。
-     * 采样直接从源像素一次完成（双线性），不产生中间缓冲。
-     *
-     * @param slot 缓冲区槽位，级联中各级必须使用不同槽位，避免互相覆盖
-     */
-    private fun buildScaledFrame(
-        srcRowStride: Int,
-        pixelStride: Int,
-        imgW: Int,
-        imgH: Int,
-        bounds: FloatArray,
-        scale: Int,
-        slot: Int
-    ): FrameExtractor.GrayFrame? {
-        val target = BASE_DECODE_WIDTH * scale
-        return FrameExtractor.extractToWidth(
-            srcRowStride, pixelStride, imgW, imgH, bounds, target, slot
-        )
-    }
-
-    /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈（含活码联网解析） */
+    /** 澶勭悊涓€涓В鐮佺粨鏋滐細鎸夋ā寮忚褰曞苟鍒锋柊鎮诞绐?鍙嶉锛堝惈娲荤爜鑱旂綉瑙ｆ瀽锛?*/
     private fun processResult(result: QrDecoder.DecodeResult) {
         if (workMode == SettingsManager.MODE_GAME) {
-            // 比赛导航模式
+            // 姣旇禌瀵艰埅妯″紡
             val raw = result.text
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
-                // 活码：联网解析真实内容，再从真实内容提取数字（短链本身没有有效数字）
+                // 娲荤爜锛氳仈缃戣В鏋愮湡瀹炲唴瀹癸紝鍐嶄粠鐪熷疄鍐呭鎻愬彇鏁板瓧锛堢煭閾炬湰韬病鏈夋湁鏁堟暟瀛楋級
                 val url = raw.trim()
-                // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
+                // 鍐峰嵈锛氬睆骞曚笂鐨勬椿鐮佸父椹绘椂锛屽悓涓€ URL 3 绉掑唴鍙В鏋愪竴娆★紝閬垮厤鍙嶅 loading/鍒锋柊
                 if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
                 if (!dup) {
@@ -351,7 +348,7 @@ class QrScanService : Service() {
                         val live = try { LiveCodeResolver.resolve(url) } catch (e: Exception) { null }
                         synchronized(pendingLive) { pendingLive.remove(url) }
                         GameState.endLive()
-                        // 解析失败：短链域名含数字（qr61→61），兜底会误记，直接丢弃不记录
+                        // 瑙ｆ瀽澶辫触锛氱煭閾惧煙鍚嶅惈鏁板瓧锛坬r61鈫?1锛夛紝鍏滃簳浼氳璁帮紝鐩存帴涓㈠純涓嶈褰?
                         val content = live?.content?.trim()
                         if (content.isNullOrBlank()) {
                             mainHandler.post { FloatingResultManager.update(this) }
@@ -366,7 +363,7 @@ class QrScanService : Service() {
                     }
                 }
             } else {
-                // 普通码
+                // 鏅€氱爜
                 val isNew = GameState.parseAndRecord(raw)
                 if (isNew) {
                     qrCount++
@@ -377,12 +374,12 @@ class QrScanService : Service() {
                 }
             }
         } else {
-            // 纯扫码模式
+            // 绾壂鐮佹ā寮?
             val raw = result.text
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
-                // 活码（网络二维码）：独立线程联网读取后台真实内容
+                // 娲荤爜锛堢綉缁滀簩缁寸爜锛夛細鐙珛绾跨▼鑱旂綉璇诲彇鍚庡彴鐪熷疄鍐呭
                 val url = raw.trim()
-                // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
+                // 鍐峰嵈锛氬睆骞曚笂鐨勬椿鐮佸父椹绘椂锛屽悓涓€ URL 3 绉掑唴鍙В鏋愪竴娆★紝閬垮厤鍙嶅 loading/鍒锋柊
                 if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
                 if (!dup) {
@@ -395,7 +392,7 @@ class QrScanService : Service() {
                         } catch (e: Exception) { null }
                         synchronized(pendingLive) { pendingLive.remove(url) }
                         ScanHistory.endLive()
-                        // 成功显示真实内容，失败兜底显示原始链接
+                        // 鎴愬姛鏄剧ず鐪熷疄鍐呭锛屽け璐ュ厹搴曟樉绀哄師濮嬮摼鎺?
                         val display = live?.content ?: url
                         val isNew = ScanHistory.add(display)
                         if (isNew) qrCount++
@@ -407,7 +404,7 @@ class QrScanService : Service() {
                     }
                 }
             } else {
-                // 普通码
+                // 鏅€氱爜
                 val isNew = ScanHistory.add(raw)
                 val shouldNotify = ScanHistory.shouldNotify(raw, dedupTtlMs)
 
@@ -423,7 +420,7 @@ class QrScanService : Service() {
         }
     }
 
-    /** 速率门：距上次派发不足 interval 则返回 false */
+    /** 閫熺巼闂細璺濅笂娆℃淳鍙戜笉瓒?interval 鍒欒繑鍥?false */
     private fun shouldDispatch(now: Long, interval: Long): Boolean {
         if (lastDispatchAt >= 0 && now - lastDispatchAt < interval) return false
         lastDispatchAt = now
@@ -431,9 +428,9 @@ class QrScanService : Service() {
     }
 
     /**
-     * 活码冷却判断：同一活码 URL 在 [LIVE_COOLDOWN_MS] 内只允许触发一次解析。
-     * 屏幕上活码图案常驻时，重档每 150ms 就会命中一次；若每次都解析，
-     * 会反复 beginLive/endLive 并刷新悬浮窗，表现为「反复横跳」。
+     * 娲荤爜鍐峰嵈鍒ゆ柇锛氬悓涓€娲荤爜 URL 鍦?[LIVE_COOLDOWN_MS] 鍐呭彧鍏佽瑙﹀彂涓€娆¤В鏋愩€?
+     * 灞忓箷涓婃椿鐮佸浘妗堝父椹绘椂锛岄噸妗ｆ瘡 150ms 灏变細鍛戒腑涓€娆★紱鑻ユ瘡娆￠兘瑙ｆ瀽锛?
+     * 浼氬弽澶?beginLive/endLive 骞跺埛鏂版偓娴獥锛岃〃鐜颁负銆屽弽澶嶆í璺炽€嶃€?
      */
     private fun shouldResolveLive(url: String): Boolean {
         val now = System.currentTimeMillis()
@@ -442,7 +439,7 @@ class QrScanService : Service() {
             if (last != null && now - last < LIVE_COOLDOWN_MS) {
                 false
             } else {
-                // 控制缓存规模，避免长期运行无限增长
+                // 鎺у埗缂撳瓨瑙勬ā锛岄伩鍏嶉暱鏈熻繍琛屾棤闄愬闀?
                 if (liveLastResolvedAt.size > 64) liveLastResolvedAt.clear()
                 liveLastResolvedAt[url] = now
                 true
@@ -451,8 +448,8 @@ class QrScanService : Service() {
     }
 
     /**
-     * 廉价运动采样：从原始 RGBA 缓冲抽样 16x16（256点），转灰度后与上一帧对比；
-     * 变化点 > 3% 视为画面有运动。在提取/解码之前完成，开销极小。
+     * 寤変环杩愬姩閲囨牱锛氫粠鍘熷 RGBA 缂撳啿鎶芥牱 16x16锛?56鐐癸級锛岃浆鐏板害鍚庝笌涓婁竴甯у姣旓紱
+     * 鍙樺寲鐐?> 3% 瑙嗕负鐢婚潰鏈夎繍鍔ㄣ€傚湪鎻愬彇/瑙ｇ爜涔嬪墠瀹屾垚锛屽紑閿€鏋佸皬銆?
      */
     private fun sampleMotion(
         buffer: java.nio.ByteBuffer, rowStride: Int, pixelStride: Int, w: Int, h: Int
@@ -468,7 +465,7 @@ class QrScanService : Service() {
                 val r = buffer.get(idx).toInt() and 0xFF
                 val g = buffer.get(idx + 1).toInt() and 0xFF
                 val b = buffer.get(idx + 2).toInt() and 0xFF
-                // 与 zxing-cpp 核心 RGBToLum 一致
+                // 涓?zxing-cpp 鏍稿績 RGBToLum 涓€鑷?
                 cur[j * nx + i] = ((306 * r + 601 * g + 117 * b + 0x200) shr 10).toByte()
             }
         }
@@ -484,9 +481,9 @@ class QrScanService : Service() {
         return changed
     }
 
-    /** 纯色/黑屏判断：抽样统计灰度方差，方差极低（接近纯色）返回 true，跳过解码 */
+    /** 绾壊/榛戝睆鍒ゆ柇锛氭娊鏍风粺璁＄伆搴︽柟宸紝鏂瑰樊鏋佷綆锛堟帴杩戠函鑹诧級杩斿洖 true锛岃烦杩囪В鐮?*/
     private fun isFrameFlat(gray: java.nio.ByteBuffer, w: Int, h: Int, rowStride: Int): Boolean {
-        val step = maxOf(1, (w * h) / 4000)  // 抽样约 4000 点
+        val step = maxOf(1, (w * h) / 4000)  // 鎶芥牱绾?4000 鐐?
         var n = 0; var sum = 0L; var sumSq = 0L
         var y = 0
         while (y < h) {
@@ -516,11 +513,11 @@ class QrScanService : Service() {
     private fun updateStatusNotification(title: String? = null, text: String? = null) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val elapsed = (System.currentTimeMillis() - startTimestamp) / 1000
-        val finalTitle = title ?: "屏幕二维码识别中"
+        val finalTitle = title ?: "灞忓箷浜岀淮鐮佽瘑鍒腑"
         val finalText = text ?: if (frameCount == 0 && elapsed > 3) {
-            "已运行${elapsed}秒，未获取到画面（系统可能禁止截屏）"
+            "宸茶繍琛?{elapsed}绉掞紝鏈幏鍙栧埌鐢婚潰锛堢郴缁熷彲鑳界姝㈡埅灞忥級"
         } else {
-            "已截${frameCount}帧，识别${qrCount}个码（${elapsed}秒）"
+            "宸叉埅${frameCount}甯э紝璇嗗埆${qrCount}涓爜锛?{elapsed}绉掞級"
         }
         nm.notify(NOTI_ID, buildNotification(finalTitle, finalText))
     }
@@ -529,8 +526,8 @@ class QrScanService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
             val channel = NotificationChannel(
-                CHANNEL_ID, "屏幕二维码识别", NotificationManager.IMPORTANCE_LOW
-            ).apply { description = "连续识别屏幕上出现的二维码" }
+                CHANNEL_ID, "灞忓箷浜岀淮鐮佽瘑鍒?, NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "杩炵画璇嗗埆灞忓箷涓婂嚭鐜扮殑浜岀淮鐮? }
             nm.createNotificationChannel(channel)
         }
     }
@@ -545,7 +542,7 @@ class QrScanService : Service() {
         super.onDestroy()
     }
 
-    /** 统一释放截屏相关资源（幂等，可重复调用） */
+    /** 缁熶竴閲婃斁鎴睆鐩稿叧璧勬簮锛堝箓绛夛紝鍙噸澶嶈皟鐢級 */
     private fun cleanupCapture() {
         try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) {}
         try { virtualDisplay?.release() } catch (_: Exception) {}
