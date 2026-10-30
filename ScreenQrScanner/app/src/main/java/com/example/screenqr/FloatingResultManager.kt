@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Build
@@ -27,6 +28,7 @@ object FloatingResultManager {
     private var currentView: View? = null
     private var soundPool: SoundPool? = null
     private var beepId: Int = 0
+    private var loadedBeepId: Int = 0
 
     private fun initSound(ctx: Context) {
         if (soundPool != null) return
@@ -34,11 +36,17 @@ object FloatingResultManager {
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
-        soundPool = SoundPool.Builder()
+        val pool = SoundPool.Builder()
             .setMaxStreams(2)
             .setAudioAttributes(attrs)
             .build()
-        beepId = soundPool?.load(ctx, R.raw.beep, 1) ?: 0
+        // 加载完成后记录 id；加载完成前 beepId 保持 0，notifyRead 会静默跳过
+        pool.setOnLoadCompleteListener { _, _, status ->
+            if (status == 0) beepId = loadedBeepId
+        }
+        val id = pool.load(ctx, R.raw.beep, 1)
+        loadedBeepId = id
+        soundPool = pool
     }
 
     // 预加载音效（服务启动时调用）
@@ -132,28 +140,41 @@ object FloatingResultManager {
 
         // 背景色和文字颜色
         val (bgColor, textColor) = when (style) {
-            SettingsManager.FLOAT_STYLE_DARK -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_LIGHT -> 0xCCFFFFFF.toInt() to 0xFF000000.toInt()
+            SettingsManager.FLOAT_STYLE_DARK -> 0xE6000000.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_LIGHT -> 0xE6FFFFFF.toInt() to 0xFF101010.toInt()
             SettingsManager.FLOAT_STYLE_CLEAR -> 0x33000000 to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_PURPLE -> 0xCC6200EE.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_BLUE -> 0xCC018786.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_ORANGE -> 0xCCFF6D00.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_GREEN -> 0xCC2E7D32.toInt() to 0xFFFFFFFF.toInt()
-            else -> 0xCC000000.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_PURPLE -> 0xE66200EE.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_BLUE -> 0xE6018786.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_ORANGE -> 0xE6FF6D00.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_GREEN -> 0xE62E7D32.toInt() to 0xFFFFFFFF.toInt()
+            else -> 0xE6000000.toInt() to 0xFFFFFFFF.toInt()
         }
 
         // 应用透明度（调整alpha通道）
         val alphaFactor = alpha / 100f
         val finalBg = adjustAlpha(bgColor, alphaFactor)
 
-        root.setBackgroundColor(finalBg)
+        // 用带圆角的 GradientDrawable 设置背景，保留圆角
+        val drawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(ctx, 16f)
+            setColor(finalBg)
+        }
+        root.background = drawable
         content.setTextColor(textColor)
+
+        // 标题栏与重置按钮文字颜色跟随样式（浅色样式用深色文字）
+        val secondaryText = if (style == SettingsManager.FLOAT_STYLE_LIGHT) 0xFF404040.toInt() else 0xB0FFFFFF.toInt()
+        view.findViewById<TextView>(R.id.floatTitle)?.setTextColor(secondaryText)
     }
 
     private fun adjustAlpha(color: Int, factor: Float): Int {
         val a = (Color.alpha(color) * factor).toInt().coerceIn(0, 255)
         return (a shl 24) or (color and 0x00FFFFFF)
     }
+
+    private fun dp(ctx: Context, value: Float): Float =
+        value * ctx.resources.displayMetrics.density
 
     fun notifyRead(ctx: Context) {
         // 震动

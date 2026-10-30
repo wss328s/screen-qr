@@ -27,6 +27,7 @@ import android.view.WindowManager
 class QrScanService : Service() {
 
     companion object {
+        private const val TAG = "QrScanService"
         const val ACTION_START = "ACTION_START"
         const val ACTION_STOP = "ACTION_STOP"
         const val EXTRA_RESULT_CODE = "EXTRA_RESULT_CODE"
@@ -79,9 +80,9 @@ class QrScanService : Service() {
     private var screenH = 0
     private var density = 0
 
-    // 诊断计数
-    private var frameCount = 0
-    private var qrCount = 0
+    // 诊断计数（后台线程写、主线程读，用 @Volatile 保证可见性）
+    @Volatile private var frameCount = 0
+    @Volatile private var qrCount = 0
     private var startTimestamp = 0L
 
     private val statusUpdateRunnable = object : Runnable {
@@ -96,7 +97,13 @@ class QrScanService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"))
+        // Android 14+ 需要指定服务类型；低于 14 用兼容方式进入前台
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        } else {
+            startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"))
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -106,6 +113,8 @@ class QrScanService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
+                // 已在运行则忽略重复启动（防止重复注册 MediaProjection 回调/泄漏）
+                if (isRunning) return START_STICKY
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
                 val data: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(EXTRA_RESULT_DATA, Intent::class.java)
@@ -126,11 +135,17 @@ class QrScanService : Service() {
     private fun startCapturing(resultCode: Int, data: Intent) {
         val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         mediaProjection = mpm.getMediaProjection(resultCode, data)
+        if (mediaProjection == null) {
+            updateStatusNotification("错误", "无法创建截屏投影，请重新授权")
+            stopSelf()
+            return
+        }
         mediaProjection?.registerCallback(object : MediaProjection.Callback() {
             override fun onStop() {
-                // 系统主动停止截屏，不要直接杀服务，更新通知让用户看到
+                // 系统主动停止截屏：清理资源并结束服务，避免残留半启动状态
                 mainHandler.post {
-                    updateStatusNotification()
+                    updateStatusNotification("已停止", "截屏已被系统或用户停止")
+                    stopSelf()
                 }
             }
         }, mainHandler)
@@ -169,10 +184,15 @@ class QrScanService : Service() {
             )
             if (virtualDisplay == null) {
                 updateStatusNotification("错误", "VirtualDisplay 创建失败，系统不允许截屏")
+                cleanupCapture()
+                stopSelf()
                 return
             }
         } catch (e: Exception) {
             updateStatusNotification("错误", "截屏初始化异常: ${e.message}")
+            // 初始化失败时清理已部分创建的资源，避免泄漏
+            cleanupCapture()
+            stopSelf()
             return
         }
 
@@ -252,6 +272,8 @@ class QrScanService : Service() {
                 }
             }
         } catch (e: Exception) {
+            // 单帧处理异常不应中断服务；记录到日志便于排查
+            android.util.Log.w(TAG, "handleFrame error: ${e.message}")
         }
     }
 
@@ -407,7 +429,7 @@ class QrScanService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
     }
@@ -437,13 +459,21 @@ class QrScanService : Service() {
     override fun onDestroy() {
         isRunning = false
         mainHandler.removeCallbacks(statusUpdateRunnable)
-        try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) {}
-        try { virtualDisplay?.release() } catch (_: Exception) {}
-        try { imageReader?.close() } catch (_: Exception) {}
-        try { mediaProjection?.stop() } catch (_: Exception) {}
+        cleanupCapture()
         FloatingResultManager.hideAll(this)
         try { liveExecutor.shutdownNow() } catch (_: Exception) {}
         workerThread.quitSafely()
         super.onDestroy()
+    }
+
+    /** 统一释放截屏相关资源（幂等，可重复调用） */
+    private fun cleanupCapture() {
+        try { imageReader?.setOnImageAvailableListener(null, null) } catch (_: Exception) {}
+        try { virtualDisplay?.release() } catch (_: Exception) {}
+        try { imageReader?.close() } catch (_: Exception) {}
+        try { mediaProjection?.stop() } catch (_: Exception) {}
+        virtualDisplay = null
+        imageReader = null
+        mediaProjection = null
     }
 }

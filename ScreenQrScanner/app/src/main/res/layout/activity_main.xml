@@ -15,20 +15,21 @@
 
         <!-- 图标 -->
         <ImageView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:src="@android:drawable/ic_menu_camera"
-            android:layout_marginTop="40dp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:src="@mipmap/ic_launcher"
+            android:layout_marginTop="36dp"
+            android:layout_marginBottom="20dp"/>
 
         <!-- 标题 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="屏幕二维码连续识别"
-            android:textColor="@color/white"
-            android:textSize="24sp"
+            android:text="屏幕二维码识别"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
             android:textStyle="bold"
+            android:letterSpacing="0.02"
             android:paddingBottom="8dp"/>
 
         <!-- 副标题 -->
@@ -38,50 +39,75 @@
             android:text="后台连续截屏 · 自动识别 · 悬浮窗显示"
             android:textColor="@color/text_secondary"
             android:textSize="14sp"
-            android:paddingBottom="32dp"/>
+            android:paddingBottom="36dp"/>
 
         <!-- 状态卡片 -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="#14FFFFFF"
             android:layout_marginBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
+                android:orientation="horizontal"
+                android:padding="20dp"
+                android:gravity="center_vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="当前状态"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"/>
+                <!-- 状态圆点 -->
+                <View
+                    android:id="@+id/statusDot"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:background="@drawable/status_dot"
+                    android:layout_marginEnd="12dp"/>
 
-                <TextView
-                    android:id="@+id/statusText"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="状态：未启动"
-                    android:textColor="@color/white"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="4dp"/>
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="当前状态"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="12sp"/>
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="状态：未启动"
+                        android:textColor="@color/text_primary"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="4dp"/>
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 启动按钮 -->
+        <!-- 启动按钮（渐变） -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/startBtn"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="58dp"
             android:text="启动连续识别"
-            android:textSize="16sp"
-            app:cornerRadius="16dp"/>
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/dark_bg"
+            android:background="@drawable/btn_gradient"
+            app:backgroundTint="@null"
+            app:cornerRadius="18dp"
+            app:icon="@android:drawable/ic_media_play"
+            app:iconGravity="textStart"
+            app:iconPadding="8dp"/>
 
         <!-- 停止按钮 -->
         <com.google.android.material.button.MaterialButton
@@ -90,9 +116,11 @@
             android:layout_height="56dp"
             android:text="停止"
             android:textSize="16sp"
-            android:layout_marginTop="12dp"
-            app:cornerRadius="16dp"
-            app:backgroundTint="@color/card_bg"/>
+            android:textColor="@color/text_secondary"
+            android:background="@drawable/btn_outline"
+            app:backgroundTint="@null"
+            app:cornerRadius="18dp"
+            android:layout_marginTop="12dp"/>
 
         <!-- 设置按钮 -->
         <com.google.android.material.button.MaterialButton
@@ -101,19 +129,21 @@
             android:layout_height="56dp"
             android:text="设置"
             android:textSize="16sp"
-            android:layout_marginTop="12dp"
-            app:cornerRadius="16dp"
-            app:backgroundTint="@color/card_bg"/>
+            android:textColor="@color/text_secondary"
+            android:background="@drawable/btn_outline"
+            app:backgroundTint="@null"
+            app:cornerRadius="18dp"
+            android:layout_marginTop="12dp"/>
 
         <!-- 底部说明 -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="需要授予悬浮窗权限和屏幕录制权限"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_tertiary"
             android:textSize="12sp"
             android:gravity="center"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="36dp"
             android:layout_marginBottom="24dp"/>
 
     </LinearLayout>

@@ -3,11 +3,14 @@ package com.example.screenqr
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -17,12 +20,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private lateinit var statusText: TextView
+    private lateinit var statusDot: View
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
 
     companion object {
         private const val REQ_SCREEN_CAPTURE = 1001
         private const val REQ_OVERLAY = 1002
+        private const val COLOR_RUNNING = 0xFF3DDC84.toInt()
+        private const val COLOR_IDLE = 0xFF6E7686.toInt()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         statusText = findViewById(R.id.statusText)
+        statusDot = findViewById(R.id.statusDot)
         startBtn = findViewById(R.id.startBtn)
         stopBtn = findViewById(R.id.stopBtn)
 
@@ -53,6 +60,12 @@ class MainActivity : AppCompatActivity() {
         if (!QrScanService.isRunning) {
             ensurePermissionsAndStart()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 从设置/系统权限页返回时同步状态
+        refreshStatus()
     }
 
     private fun ensurePermissionsAndStart() {
@@ -104,5 +117,15 @@ class MainActivity : AppCompatActivity() {
         val running = QrScanService.isRunning
         statusText.text = if (running) "状态：正在后台连续识别" else "状态：未启动"
         startBtn.isEnabled = !running
+        startBtn.alpha = if (running) 0.4f else 1f
+        setDotColor(statusDot, if (running) COLOR_RUNNING else COLOR_IDLE)
+    }
+
+    /** 动态设置状态圆点颜色 */
+    private fun setDotColor(view: View, color: Int) {
+        val bg = view.background
+        if (bg is GradientDrawable) {
+            bg.mutate().setColor(color)
+        }
     }
 }
