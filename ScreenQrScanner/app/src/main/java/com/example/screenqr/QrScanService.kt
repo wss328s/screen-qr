@@ -36,17 +36,10 @@ class QrScanService : Service() {
         private const val CHANNEL_ID = "screen_qr_channel"
         private const val NOTI_ID = 1001
 
-        // 全图增强档的最大宽度（保护上限，QR识别不需要更高；小码可到设置里手动开 3200）
-        private const val MAX_DECODE_WIDTH = 1440
+        // 全图增强档的最大宽度（保护上限，QR识别不需要更高）
+        private const val MAX_DECODE_WIDTH = 1920
         // 快速档目标宽度：小图先跑，像素少→快；清晰码在此命中
         private const val FAST_DECODE_WIDTH = 720
-
-        // 突发期（画面刚变化，可能有新码）的扫描间隔：15fps 已足够灵敏，30fps 白烧CPU
-        private const val BURST_INTERVAL_MS = 66L
-        // 重档（全图增强）最小间隔：静止画面无需每帧都跑重型解码
-        private const val HEAVY_INTERVAL_MS = 400L
-        // 突发期内重档的最小间隔：比静止期更密，但也要限流避免1.5秒内狂跑几十次
-        private const val HEAVY_BURST_INTERVAL_MS = 150L
 
         @Volatile
         var isRunning = false
@@ -77,8 +70,6 @@ class QrScanService : Service() {
     private var lastSample: ByteArray? = null
     // 上次实际提取/解码的时间（速率门，-1=尚未派发）
     private var lastDispatchAt = -1L
-    // 上次执行重档（全图增强）解码的时间（重档独立节流，-1=尚未执行）
-    private var lastHeavyAt = -1L
 
     // 活码网络请求线程池（独立于扫描线程，联网等待不阻塞扫码）
     private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
@@ -242,8 +233,8 @@ class QrScanService : Service() {
                 burstUntilElapsed = now + 1500L
             }
 
-            // 2) 扫描间隔：突发期最快 66ms(15fps)，否则按设定周期
-            val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, BURST_INTERVAL_MS) else scanIntervalMs
+            // 2) 扫描间隔：突发期最快 33ms(30fps)，否则按设定周期
+            val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
 
             // 3) 速率门：未到间隔则跳过，避免密集提取/解码
             if (!shouldDispatch(now, interval)) return
@@ -266,14 +257,9 @@ class QrScanService : Service() {
                 }
             }
 
-            // 6) 第二级：重档独立节流，避免「无码画面也每帧跑全图重型解码」拖慢整体
-            //    - 突发期（画面刚变化，可能新码）：每 150ms 跑一次重档，保证灵敏
-            //    - 静止期：增强档每 400ms 跑一次重档；关闭增强则只在突发期跑
-            val heavyEnabled = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
-            val heavyInterval = if (now < burstUntilElapsed) HEAVY_BURST_INTERVAL_MS else HEAVY_INTERVAL_MS
-            val doHeavy = heavyEnabled && (lastHeavyAt < 0 || now - lastHeavyAt >= heavyInterval)
+            // 6) 第二级：仅在突发期（新码可能出现）或非关闭档，用全图 + 重配置
+            val doHeavy = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
             if (doHeavy) {
-                lastHeavyAt = now
                 val largeMax = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
                 val large = FrameExtractor.extract(
                     srcRowStride, pixelStride, imgW, imgH, bounds, largeMax
