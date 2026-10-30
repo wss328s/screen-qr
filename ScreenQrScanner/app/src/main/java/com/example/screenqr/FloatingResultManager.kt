@@ -34,6 +34,8 @@ object FloatingResultManager {
     private var loadedBeepId: Int = 0
     // 悬浮窗布局参数（拖拽移动时更新 x/y）
     private var layoutParams: WindowManager.LayoutParams? = null
+    // 上次应用的样式键（样式+透明度），相同则跳过背景重建
+    private var lastStyleKey: String? = null
 
     private fun initSound(ctx: Context) {
         if (soundPool != null) return
@@ -114,7 +116,11 @@ object FloatingResultManager {
             }
         } else {
             currentView?.let { applyStyle(ctx, it) }
-            currentView?.findViewById<TextView>(R.id.qrContent)?.text = text
+            // 文本未变化时不重复赋值，避免无谓重绘
+            val content = currentView?.findViewById<TextView>(R.id.qrContent)
+            if (content != null && content.text?.toString() != text) {
+                content.text = text
+            }
         }
     }
 
@@ -144,6 +150,11 @@ object FloatingResultManager {
     private fun applyStyle(ctx: Context, view: View) {
         val style = SettingsManager.getFloatStyle(ctx)
         val alpha = SettingsManager.getFloatAlpha(ctx)
+        // 样式/透明度未变化时跳过重建背景，避免每次刷新都重绘（减少闪烁）
+        val styleKey = "$style-$alpha"
+        if (styleKey == lastStyleKey) return
+        lastStyleKey = styleKey
+
         val root = view.findViewById<LinearLayout>(R.id.floatRoot)
         val content = view.findViewById<TextView>(R.id.qrContent)
 
@@ -278,5 +289,8 @@ object FloatingResultManager {
             try { wm.removeView(it) } catch (_: Exception) {}
         }
         currentView = null
+        layoutParams = null
+        // 重置样式缓存：下次重建 view 时必须重新应用样式
+        lastStyleKey = null
     }
 }

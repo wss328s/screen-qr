@@ -84,6 +84,10 @@ class QrScanService : Service() {
     private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
     // 正在联网解析的活码URL（避免重复请求）
     private val pendingLive = HashSet<String>()
+    // 活码 URL 最近一次触发解析的时间：冷却期内不重复解析，避免屏幕活码常驻时反复刷新
+    private val liveLastResolvedAt = HashMap<String, Long>()
+    // 同一活码 URL 的解析冷却时长（避免屏上活码常驻时反复 loading；重置后 2 秒内同码不重复解析）
+    private val LIVE_COOLDOWN_MS = 2000L
 
     private var screenW = 0
     private var screenH = 0
@@ -299,6 +303,8 @@ class QrScanService : Service() {
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
                 // 活码：联网解析真实内容，再从真实内容提取数字（短链本身没有有效数字）
                 val url = raw.trim()
+                // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
+                if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
                 if (!dup) {
                     synchronized(pendingLive) { pendingLive.add(url) }
@@ -339,6 +345,8 @@ class QrScanService : Service() {
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
                 // 活码（网络二维码）：独立线程联网读取后台真实内容
                 val url = raw.trim()
+                // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
+                if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
                 if (!dup) {
                     synchronized(pendingLive) { pendingLive.add(url) }
@@ -383,6 +391,26 @@ class QrScanService : Service() {
         if (lastDispatchAt >= 0 && now - lastDispatchAt < interval) return false
         lastDispatchAt = now
         return true
+    }
+
+    /**
+     * 活码冷却判断：同一活码 URL 在 [LIVE_COOLDOWN_MS] 内只允许触发一次解析。
+     * 屏幕上活码图案常驻时，重档每 150ms 就会命中一次；若每次都解析，
+     * 会反复 beginLive/endLive 并刷新悬浮窗，表现为「反复横跳」。
+     */
+    private fun shouldResolveLive(url: String): Boolean {
+        val now = System.currentTimeMillis()
+        return synchronized(liveLastResolvedAt) {
+            val last = liveLastResolvedAt[url]
+            if (last != null && now - last < LIVE_COOLDOWN_MS) {
+                false
+            } else {
+                // 控制缓存规模，避免长期运行无限增长
+                if (liveLastResolvedAt.size > 64) liveLastResolvedAt.clear()
+                liveLastResolvedAt[url] = now
+                true
+            }
+        }
     }
 
     /**
