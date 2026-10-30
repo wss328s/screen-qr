@@ -59,7 +59,7 @@
         android:maxLines="14"
         android:ellipsize="end"/>
 
-    <!-- 底部：重置按钮（固定最小宽度并居中，不撑破悬浮窗宽度） -->
+    <!-- 底部：重置按钮（背景与「复制」保持一致） -->
     <Button
         android:id="@+id/closeBtn"
         android:layout_width="wrap_content"
@@ -69,9 +69,9 @@
         android:minHeight="0dp"
         android:text="重置"
         android:textSize="12sp"
-        android:textColor="#FF000000"
+        android:textColor="#FFFFFFFF"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
-        android:background="@drawable/btn_gradient"/>
+        android:background="@drawable/clear_btn_bg"/>
 
 </LinearLayout>

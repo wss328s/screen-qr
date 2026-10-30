@@ -481,20 +481,33 @@ class QrScanService : Service() {
     }
 
     /** 纯色/黑屏判断：抽样统计灰度方差，方差极低（接近纯色）返回 true，跳过解码 */
+    /**
+     * 纯色/黑屏快速判断：抽样统计灰度方差，方差极低（接近纯色）返回 true，跳过解码。
+     *
+     * 注意：x/y 必须**分别**计算步长。此前用同一个 step 同时跨 x 和 y，
+     * 在高分辨率（3540/4720 档）下采样点数会退化成 2~6 个，方差必然接近 0，
+     * 导致几乎每一帧都被误判成「纯色」而跳过解码 —— 这是必须避免的陷阱。
+     */
     private fun isFrameFlat(gray: java.nio.ByteBuffer, w: Int, h: Int, rowStride: Int): Boolean {
-        val step = maxOf(1, (w * h) / 4000)  // 抽样约 4000 点
+        // 目标采样约 2000 点：分别按 x/y 维度摊分，避免任一维度过稀
+        val targetSamples = 2000
+        val stepX = maxOf(1, kotlin.math.sqrt((w.toLong() * h / targetSamples).toDouble()).toInt()).coerceAtMost(w)
+        val stepY = maxOf(1, (h * stepX / w).coerceAtLeast(1)).coerceAtMost(h)
+
         var n = 0; var sum = 0L; var sumSq = 0L
         var y = 0
         while (y < h) {
+            val rowBase = y * rowStride
             var x = 0
             while (x < w) {
-                val v = gray.get(y * rowStride + x).toInt() and 0xFF
+                val v = gray.get(rowBase + x).toInt() and 0xFF
                 sum += v; sumSq += v.toLong() * v; n++
-                x += step
+                x += stepX
             }
-            y += step
+            y += stepY
         }
-        if (n == 0) return true
+        // 采样过少时不作判断（宁可多解一次，也不能误跳过）
+        if (n < 64) return false
         val mean = sum.toDouble() / n
         val variance = (sumSq.toDouble() / n) - mean * mean
         return variance < 25.0
