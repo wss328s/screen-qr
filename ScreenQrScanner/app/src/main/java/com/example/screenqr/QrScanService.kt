@@ -259,7 +259,7 @@ class QrScanService : Service() {
             val scaled = buildScaledFrame(
                 srcRowStride, pixelStride, imgW, imgH, bounds, SCALE_FIRST, slot = 1
             )
-            if (scaled != null) {
+            if (scaled != null && !isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) {
                 scaled.gray.rewind()
                 val hit = QrDecoder.decodeFast(
                     scaled.gray, scaled.rowStride, scaled.width, scaled.height
