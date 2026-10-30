@@ -41,15 +41,12 @@ class QrScanService : Service() {
         // 快速档目标宽度：小图先跑，像素少→快；清晰码在此命中
         private const val FAST_DECODE_WIDTH = 720
 
-        // ===== 图传场景专用解码参数（基于 3 段真实无人机图传素材实测确定）=====
-        // 实测结论：二维码在画面上位置不固定（可能贴在下边缘，固定 ROI 会裁掉一半），
-        // 且常见倾斜/卷曲/蓝底，因此必须**全屏**解码且必须**放大**。
-        //
-        // 三级倍率实测（v1/v2/v3 三段素材共 1566 帧）：
-        //   3540px 命中最多（约 91%）、4720px 救更小的码、2360px 兜较大的码
-        private const val DECODE_WIDTH_MAIN = 3540
-        private const val DECODE_WIDTH_SMALL = 4720
-        private const val DECODE_WIDTH_LARGE = 2360
+        // ===== 图传场景解码参数（基于真实素材 + 真机 1920×1080 实测确定）=====
+        // 关键结论：单级 3540 宽命中率已最优（约 11%~42%），且单帧仅 18~20ms；
+        // 多级级联会因「未命中帧跑满多级」把耗时拉到 41~56ms，帧率腰斩，
+        // 反而漏识别（这正是 v2.1/v2.2 比 v2.0 差的原因）。
+        // 故这里只用单级 3540，保证扫描帧率最高、不积压。
+        private const val DECODE_WIDTH = 3540
 
         /** 全屏边界（图传画面里码的位置不固定，必须整屏扫） */
         private val FULL_BOUNDS = floatArrayOf(0f, 0f, 1f, 1f)
@@ -63,7 +60,6 @@ class QrScanService : Service() {
     private val workMode: Int get() = SettingsManager.getMode(this)
     private val scanIntervalMs: Long get() = SettingsManager.fpsToIntervalMs(SettingsManager.getFps(this))
     private val dedupTtlMs: Long get() = SettingsManager.getDedup(this).toLong() * 1000
-    private val enhanceMode: Int get() = SettingsManager.getEnhance(this)
 
     private var mediaProjection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
@@ -82,8 +78,6 @@ class QrScanService : Service() {
     private var lastSample: ByteArray? = null
     // 上次实际提取/解码的时间（速率门，-1=尚未派发）
     private var lastDispatchAt = -1L
-    // 上次解码实际耗时（毫秒），用于自适应间隔，避免帧积压
-    private var lastDecodeCostMs = 0L
 
     // 活码网络请求线程池（独立于扫描线程，联网等待不阻塞扫码）
     private val liveExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
@@ -231,11 +225,12 @@ class QrScanService : Service() {
     }
 
     /**
-     * 处理一帧：运动采样 -> 速率门 -> 源帧拷贝 -> 多级倍率级联解码。
+     * 处理一帧：运动采样 -> 速率门 -> 源帧拷贝 -> 单级放大解码。
      *
-     * 注意：放大到 3540px 后单帧解码约 30~40ms，若固定 33ms 间隔会帧积压、
-     * 延迟越拖越大。故用「自适应间隔」：以实测耗时为准，保证解码不堆积
-     * （宁可少解几帧，也不要延迟累积）。
+     * 为什么只用单级（3540 宽）而非多级级联：
+     * 实测（真机 1920×1080 + 3 段素材）单级 3540 单帧约 18~20ms、命中率已最优；
+     * 多级级联会把「未命中帧」拖到 41~56ms，帧率腰斩，反而漏识别。
+     * 保持单级 = 扫描帧率最高、不积压，这是速度与识别的平衡点。
      */
     private fun handleFrame(image: android.media.Image) {
         frameCount++
@@ -253,27 +248,18 @@ class QrScanService : Service() {
                 burstUntilElapsed = now + 1500L
             }
 
-            // 2) 扫描间隔：突发期尽量快，但不得低于上次实际解码耗时（防积压）
-            val userInterval = scanIntervalMs
-            val adaptiveFloor = (lastDecodeCostMs * 1.1f).toLong().coerceAtLeast(33L)
-            val interval = if (now < burstUntilElapsed) maxOf(minOf(userInterval, 33L), adaptiveFloor)
-                           else maxOf(userInterval, adaptiveFloor)
+            // 2) 扫描间隔：突发期最快 33ms(30fps)，否则按用户设定周期
+            val interval = if (now < burstUntilElapsed) minOf(scanIntervalMs, 33L) else scanIntervalMs
 
-            // 3) 速率门：未到间隔则跳过，避免密集提取/解码
+            // 3) 速率门：未到间隔则跳过
             if (!shouldDispatch(now, interval)) return
 
-            // 4) 源帧一次性拷贝（各级解码复用，不重复拷全屏）
+            // 4) 源帧一次性拷贝
             FrameExtractor.copySource(srcBuffer)
-            val decodeStart = android.os.SystemClock.elapsedRealtime()
-            val bounds = FULL_BOUNDS
 
-            // ===== 图传场景解码级联（参数由 3 段真实素材实测确定）=====
-            // 实测：码位置不固定（可能贴画面下边缘），固定 ROI 会把码裁掉一半；
-            // 且必须放大，否则远处小码完全解不出。故此处用全屏 + 多级倍率。
-
-            // 第 1 级：全屏 × 3540（实测约 91% 的命中都在这一级）
+            // 5) 单级：全屏 × 3540 放大解码（LocalAverage + tryDownscale + 旋转/反色）
             val scaled = FrameExtractor.extractToWidth(
-                srcRowStride, pixelStride, imgW, imgH, bounds, DECODE_WIDTH_MAIN, slot = 1
+                srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, DECODE_WIDTH, slot = 1
             )
             if (scaled != null && !isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) {
                 scaled.gray.rewind()
@@ -282,46 +268,8 @@ class QrScanService : Service() {
                 )
                 if (hit != null) {
                     processResult(hit)
-                    return
                 }
             }
-
-            // 第 2 级：3x 放大（拯救更小的码；仅在突发期或增强开启时尝试，控制功耗）
-            val doSecond = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
-            if (doSecond) {
-                // 第 2 级：全屏 × 4720（拯救更小的码）
-                val big = FrameExtractor.extractToWidth(
-                    srcRowStride, pixelStride, imgW, imgH, bounds, DECODE_WIDTH_SMALL, slot = 2
-                )
-                if (big != null) {
-                    big.gray.rewind()
-                    val hit2 = QrDecoder.decodeHeavy(
-                        big.gray, big.rowStride, big.width, big.height, enhanceMode
-                    )
-                    if (hit2 != null) {
-                        processResult(hit2)
-                        return
-                    }
-                }
-
-                // 第 3 级：全屏 × 2360（较大的码；放大过度反而破坏结构）
-                val native = FrameExtractor.extractToWidth(
-                    srcRowStride, pixelStride, imgW, imgH, bounds, DECODE_WIDTH_LARGE, slot = 3
-                )
-                if (native != null) {
-                    native.gray.rewind()
-                    val hit3 = QrDecoder.decodeHeavy(
-                        native.gray, native.rowStride, native.width, native.height, enhanceMode
-                    )
-                    if (hit3 != null) {
-                        processResult(hit3)
-                        return
-                    }
-                }
-            }
-
-            // 记录本帧实际解码耗时，供下一帧的自适应间隔使用（防积压）
-            lastDecodeCostMs = android.os.SystemClock.elapsedRealtime() - decodeStart
         } catch (e: Exception) {
             // 单帧处理异常不应中断服务；记录到日志便于排查
             android.util.Log.w(TAG, "handleFrame error: ${e.message}")
