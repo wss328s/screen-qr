@@ -3,104 +3,140 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/dark_bg">
+    android:background="@color/dark_bg"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="28dp"
+        android:paddingBottom="36dp">
 
+        <!-- ===== 页面标题 ===== -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="扫码设置"
-            android:textColor="@color/white"
-            android:textSize="24sp"
+            android:text="设置"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
             android:textStyle="bold"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="20dp"/>
+            android:letterSpacing="0.02" />
 
-        <!-- 分组：权限 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="权限"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="6dp"
+            android:text="调整识别行为与悬浮窗外观"
+            android:textColor="@color/text_tertiary"
+            android:textSize="12sp" />
 
-        <!-- 悬浮窗权限 -->
+        <!-- ================= 权限 ================= -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="权限"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/overlayPermCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="悬浮窗权限"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/overlayPermValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="未授予"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="点击申请悬浮窗权限，用于在其他应用上显示结果"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="在其他应用之上显示识别结果，点击前往授权"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：启动 -->
-        <TextView
+        <!-- ================= 启动 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="启动"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <!-- 开机自启 -->
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="启动"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/bootCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="6dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -112,131 +148,151 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="开机自启"
-                        android:textColor="@color/white"
-                        android:textSize="17sp"
-                        android:textStyle="bold"/>
+                        style="@style/TextAppearance.CardTitle" />
 
                     <TextView
                         android:id="@+id/bootValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:text="已开启"
-                        android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        android:layout_marginTop="6dp"/>
+                        style="@style/TextAppearance.CardValue" />
                 </LinearLayout>
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/bootSwitch"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：工作模式 -->
-        <TextView
+        <!-- ================= 工作模式 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="工作模式"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <!-- 模式选择 -->
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="工作模式"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/modeCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="6dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="识别模式"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/modeValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="纯扫码"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="纯扫码：记录所有二维码；比赛导航：4岔路×3码自动比大小"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="纯扫码：记录全部内容；比赛导航：4 岔路 × 3 码自动比大小"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：识别参数 -->
-        <TextView
+        <!-- ================= 识别参数 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="识别参数"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="识别参数"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
 
         <!-- 识别频率 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/fpsCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="识别频率"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/fpsValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="5 帧/秒（200ms）"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="每秒分析多少帧，帧率越高越灵敏，耗电也越高"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="越高越灵敏，也越耗电"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -245,41 +301,42 @@
             android:id="@+id/dedupCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="去重窗口"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/dedupValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="5 秒"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="同一内容在设定时间内只提示一次"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -288,41 +345,42 @@
             android:id="@+id/enhanceCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="识别增强（对焦不实/小码）"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    android:text="识别增强"
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/enhanceValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="标准（对比度增强）"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="关闭：失败时不增强；标准：追加对比度；增强：锐化+对比度"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="针对对焦不实、小码、反光场景"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -331,41 +389,42 @@
             android:id="@+id/scaleCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="分析精度（小码必看）"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    android:text="分析精度"
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/scaleValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="原生分辨率（不缩放）"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="原生保留每个像素，小码/远距离首选；缩小后更快"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="原生保留每个像素，小码/远距离首选；缩小后更省电更快"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -374,70 +433,83 @@
             android:id="@+id/regionCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="识别区域（ROI）"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    android:text="识别区域"
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/regionValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="图传安全区（约77%，推荐）"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="只扫二维码会出现的区域，区域越小像素越少、速度越快"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    android:layout_marginTop="6dp"
+                    android:text="只扫描码可能出现的位置，区域越小越快"
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：悬浮窗外观 -->
-        <TextView
+        <!-- ================= 悬浮窗 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="悬浮窗外观"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <!-- 悬浮窗开关 -->
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="悬浮窗"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/floatCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -449,139 +521,146 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="悬浮窗显示结果"
-                        android:textColor="@color/white"
-                        android:textSize="17sp"
-                        android:textStyle="bold"/>
+                        style="@style/TextAppearance.CardTitle" />
 
                     <TextView
                         android:id="@+id/floatValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:text="已开启"
-                        android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        android:layout_marginTop="6dp"/>
+                        style="@style/TextAppearance.CardValue" />
                 </LinearLayout>
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/floatSwitch"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 悬浮窗样式 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/floatStyleCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="悬浮窗样式"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/floatStyleValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="深色"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="深色 / 浅色 / 透明 / 紫色 / 蓝色 / 橙色 / 绿色"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardHint" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 透明度 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/floatAlphaCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="悬浮窗透明度"
-                    android:textColor="@color/white"
-                    android:textSize="17sp"
-                    android:textStyle="bold"/>
+                    style="@style/TextAppearance.CardTitle" />
 
                 <TextView
                     android:id="@+id/floatAlphaValue"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
                     android:text="100%"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:layout_marginTop="6dp"/>
+                    style="@style/TextAppearance.CardValue" />
 
                 <SeekBar
                     android:id="@+id/floatAlphaSeek"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
                     android:max="100"
-                    android:progress="100"
-                    android:layout_marginTop="10dp"/>
+                    android:progress="100" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：反馈 -->
-        <TextView
+        <!-- ================= 反馈 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="反馈"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <!-- 震动 -->
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="反馈"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
+
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/vibrateCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="10dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -593,43 +672,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="震动反馈"
-                        android:textColor="@color/white"
-                        android:textSize="17sp"
-                        android:textStyle="bold"/>
+                        style="@style/TextAppearance.CardTitle" />
 
                     <TextView
                         android:id="@+id/vibrateValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:text="已开启"
-                        android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        android:layout_marginTop="6dp"/>
+                        style="@style/TextAppearance.CardValue" />
                 </LinearLayout>
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/vibrateSwitch"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 音效 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/soundCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -641,43 +718,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="音效反馈"
-                        android:textColor="@color/white"
-                        android:textSize="17sp"
-                        android:textStyle="bold"/>
+                        style="@style/TextAppearance.CardTitle" />
 
                     <TextView
                         android:id="@+id/soundValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:text="已开启"
-                        android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        android:layout_marginTop="6dp"/>
+                        style="@style/TextAppearance.CardValue" />
                 </LinearLayout>
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/soundSwitch"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 活码解析开关 -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/liveCodeCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="20dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="18dp">
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -688,68 +763,77 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="活码解析（网络二维码）"
-                        android:textColor="@color/white"
-                        android:textSize="17sp"
-                        android:textStyle="bold"/>
+                        android:text="活码解析"
+                        style="@style/TextAppearance.CardTitle" />
 
                     <TextView
                         android:id="@+id/liveCodeValue"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
                         android:text="已开启"
-                        android:textColor="@color/accent"
-                        android:textSize="14sp"
-                        android:layout_marginTop="6dp"/>
+                        style="@style/TextAppearance.CardValue" />
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="扫到草料等活码时联网读取后台真实内容，后台改了也能更新"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:layout_marginTop="6dp"/>
+                        android:layout_marginTop="6dp"
+                        android:text="扫到草料等活码时联网读取后台真实内容"
+                        style="@style/TextAppearance.CardHint" />
                 </LinearLayout>
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/liveCodeSwitch"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
+                    android:layout_height="wrap_content" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 分组：设备信息 -->
-        <TextView
+        <!-- ================= 设备信息 ================= -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="设备信息"
-            android:textColor="@color/accent"
-            android:textSize="14sp"
-            android:layout_marginStart="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginTop="22dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="13dp"
+                android:background="@drawable/section_bar" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="设备信息"
+                style="@style/TextAppearance.SectionTitle" />
+        </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/deviceCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/card_bg"
-            app:cardCornerRadius="16dp"
+            app:cardCornerRadius="18dp"
             app:cardElevation="0dp"
-            android:layout_marginBottom="24dp">
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="18dp">
 
                 <TextView
                     android:id="@+id/deviceInfo"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:lineSpacingExtra="6dp"/>
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:lineSpacingExtra="6dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

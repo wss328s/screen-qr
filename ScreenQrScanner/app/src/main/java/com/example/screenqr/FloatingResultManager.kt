@@ -158,16 +158,16 @@ object FloatingResultManager {
         val root = view.findViewById<LinearLayout>(R.id.floatRoot)
         val content = view.findViewById<TextView>(R.id.qrContent)
 
-        // 背景色和文字颜色
+        // 背景色和文字颜色（与新主题体系一致）
         val (bgColor, textColor) = when (style) {
-            SettingsManager.FLOAT_STYLE_DARK -> 0xE6000000.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_LIGHT -> 0xE6FFFFFF.toInt() to 0xFF101010.toInt()
-            SettingsManager.FLOAT_STYLE_CLEAR -> 0x33000000 to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_PURPLE -> 0xE66200EE.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_BLUE -> 0xE6018786.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_ORANGE -> 0xE6FF6D00.toInt() to 0xFFFFFFFF.toInt()
-            SettingsManager.FLOAT_STYLE_GREEN -> 0xE62E7D32.toInt() to 0xFFFFFFFF.toInt()
-            else -> 0xE6000000.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_DARK -> 0xF2090C11.toInt() to 0xFFF1F5F9.toInt()
+            SettingsManager.FLOAT_STYLE_LIGHT -> 0xF2F8FAFC.toInt() to 0xFF0B1220.toInt()
+            SettingsManager.FLOAT_STYLE_CLEAR -> 0x40090C11 to 0xFFF1F5F9.toInt()
+            SettingsManager.FLOAT_STYLE_PURPLE -> 0xE66336F1.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_BLUE -> 0xE60891B2.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_ORANGE -> 0xE6F59E0B.toInt() to 0xFFFFFFFF.toInt()
+            SettingsManager.FLOAT_STYLE_GREEN -> 0xE610B981.toInt() to 0xFFFFFFFF.toInt()
+            else -> 0xF2090C11.toInt() to 0xFFF1F5F9.toInt()
         }
 
         // 应用透明度（调整alpha通道）
@@ -177,14 +177,14 @@ object FloatingResultManager {
         // 用带圆角的 GradientDrawable 设置背景，保留圆角
         val drawable = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(ctx, 16f)
+            cornerRadius = dp(ctx, 18f)
             setColor(finalBg)
         }
         root.background = drawable
         content.setTextColor(textColor)
 
-        // 标题栏与重置按钮文字颜色跟随样式（浅色样式用深色文字）
-        val secondaryText = if (style == SettingsManager.FLOAT_STYLE_LIGHT) 0xFF404040.toInt() else 0xB0FFFFFF.toInt()
+        // 标题栏文字颜色跟随样式（浅色样式用深色文字）
+        val secondaryText = if (style == SettingsManager.FLOAT_STYLE_LIGHT) 0xFF64748B.toInt() else 0xFF94A3B8.toInt()
         view.findViewById<TextView>(R.id.floatTitle)?.setTextColor(secondaryText)
     }
 

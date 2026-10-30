@@ -4,33 +4,34 @@
     android:orientation="vertical"
     android:background="@drawable/float_bg"
     android:padding="14dp"
-    android:layout_width="260dp"
-    android:layout_height="wrap_content">
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:minWidth="250dp"
+    android:maxWidth="360dp">
 
     <!-- 标题栏：识别结果 + 复制（右上角小按钮） -->
     <LinearLayout
         android:orientation="horizontal"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:gravity="center_vertical">
 
         <TextView
             android:id="@+id/floatTitle"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="识别结果"
             android:textSize="11sp"
             android:textColor="#B0FFFFFF"
             android:letterSpacing="0.05"
             android:maxLines="1"
-            android:ellipsize="end"
-            android:singleLine="true"/>
+            android:ellipsize="end"/>
 
         <Button
             android:id="@+id/copyBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
             android:text="复制"
             android:textSize="11sp"
             android:textColor="#FFFFFFFF"
@@ -43,30 +44,32 @@
             android:background="@drawable/clear_btn_bg"/>
     </LinearLayout>
 
-    <!-- 内容：宽度固定撑满，内容多少只影响高度，不影响宽度 -->
+    <!-- 内容：宽度随内容自适应（受 maxWidth 约束），内容多时换行增高，不截断行 -->
     <TextView
         android:id="@+id/qrContent"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:text="..."
         android:textSize="14sp"
         android:textColor="#FFFFFF"
         android:lineSpacingExtra="3dp"
-        android:paddingTop="8dp"
+        android:paddingTop="6dp"
         android:paddingBottom="10dp"
-        android:maxLines="12"
+        android:maxLines="14"
         android:ellipsize="end"/>
 
-    <!-- 底部：重置按钮 -->
+    <!-- 底部：重置按钮（固定最小宽度并居中，不撑破悬浮窗宽度） -->
     <Button
         android:id="@+id/closeBtn"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:minWidth="220dp"
+        android:minHeight="0dp"
         android:text="重置"
         android:textSize="12sp"
         android:textColor="#FF000000"
-        android:minWidth="0dp"
-        android:minHeight="0dp"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:background="@drawable/btn_gradient"/>

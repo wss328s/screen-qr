@@ -1,35 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 品牌主色：科技蓝紫渐变体系 -->
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- ========== 兼容旧引用（保留名称，值已更新为新体系） ========== -->
+    <color name="purple_200">#FFC7D2FE</color>
+    <color name="purple_500">#FF6366F1</color>
+    <color name="purple_700">#FF4338CA</color>
+    <color name="teal_200">#FF5EEAD4</color>
+    <color name="teal_700">#FF0F766E</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- 深色背景层级 -->
-    <color name="dark_bg">#FF0F1218</color>
-    <color name="dark_surface">#FF171B23</color>
-    <color name="card_bg">#FF1E242E</color>
-    <color name="card_bg_pressed">#FF2A323E</color>
+    <!-- ========== 背景层级（深空灰蓝，静谧高级） ========== -->
+    <color name="dark_bg">#FF090C11</color>
+    <color name="dark_surface">#FF101620</color>
+    <color name="card_bg">#FF161E29</color>
+    <color name="card_bg_pressed">#FF1E2836</color>
+    <color name="card_stroke">#1FFFFFFF</color>
 
-    <!-- 强调色：亮青 -->
-    <color name="accent">#FF2AD0FF</color>
-    <color name="accent_dim">#FF11739A</color>
+    <!-- ========== 主色 / 强调（青 → 靛蓝） ========== -->
+    <color name="accent">#FF22D3EE</color>
+    <color name="accent_dim">#FF0E7490</color>
+    <color name="accent_indigo">#FF6366F1</color>
 
-    <!-- 文字层级 -->
-    <color name="text_primary">#FFFFFFFF</color>
-    <color name="text_secondary">#FFB0B8C4</color>
-    <color name="text_tertiary">#FF6E7686</color>
+    <!-- 渐变端点 -->
+    <color name="btn_grad_start">#FF22D3EE</color>
+    <color name="btn_grad_mid">#FF38BDF8</color>
+    <color name="btn_grad_end">#FF6366F1</color>
 
-    <!-- 语义色 -->
-    <color name="success">#FF3DDC84</color>
-    <color name="warning">#FFFFB020</color>
-    <color name="danger">#FFFF5470</color>
+    <!-- ========== 文字层级 ========== -->
+    <color name="text_primary">#FFF1F5F9</color>
+    <color name="text_secondary">#FF9AA8BC</color>
+    <color name="text_tertiary">#FF64748B</color>
 
-    <!-- 主按钮渐变 -->
-    <color name="btn_grad_start">#FF2AD0FF</color>
-    <color name="btn_grad_end">#FF4A6CFF</color>
+    <!-- ========== 语义色 ========== -->
+    <color name="success">#FF34D399</color>
+    <color name="warning">#FFFBBF24</color>
+    <color name="danger">#FFF87171</color>
+
+    <!-- 语义色透明底 -->
+    <color name="success_bg">#1A34D399</color>
+    <color name="warning_bg">#1AFBBF24</color>
+    <color name="danger_bg">#1AF87171</color>
+    <color name="accent_bg">#1A22D3EE</color>
 </resources>

@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.screenqr"
         minSdk = 24          // Android 7.0 及以上
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildTypes {

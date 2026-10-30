@@ -4,6 +4,8 @@
     <gradient
         android:angle="0"
         android:startColor="@color/btn_grad_start"
-        android:endColor="@color/btn_grad_end" />
-    <corners android:radius="18dp" />
+        android:centerColor="@color/btn_grad_mid"
+        android:endColor="@color/btn_grad_end"
+        android:type="linear" />
+    <corners android:radius="16dp" />
 </shape>

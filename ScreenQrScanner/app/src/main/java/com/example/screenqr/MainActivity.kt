@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var mediaProjectionManager: MediaProjectionManager
     private lateinit var statusText: TextView
+    private lateinit var statusSub: TextView
     private lateinit var statusDot: View
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
@@ -27,8 +28,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val REQ_SCREEN_CAPTURE = 1001
         private const val REQ_OVERLAY = 1002
-        private const val COLOR_RUNNING = 0xFF3DDC84.toInt()
-        private const val COLOR_IDLE = 0xFF6E7686.toInt()
+        private const val COLOR_RUNNING = 0xFF34D399.toInt()   // success
+        private const val COLOR_IDLE = 0xFF64748B.toInt()      // text_tertiary
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +38,7 @@ class MainActivity : AppCompatActivity() {
 
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         statusText = findViewById(R.id.statusText)
+        statusSub = findViewById(R.id.statusSub)
         statusDot = findViewById(R.id.statusDot)
         startBtn = findViewById(R.id.startBtn)
         stopBtn = findViewById(R.id.stopBtn)
@@ -115,9 +117,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val running = QrScanService.isRunning
-        statusText.text = if (running) "状态：正在后台连续识别" else "状态：未启动"
+        statusText.text = if (running) "正在识别中" else "未启动"
+        statusSub.text = if (running) {
+            "前台服务运行中 · 切到任意应用即可自动识别"
+        } else {
+            "点击启动，授予权限后开始识别"
+        }
         startBtn.isEnabled = !running
-        startBtn.alpha = if (running) 0.4f else 1f
+        startBtn.alpha = if (running) 0.45f else 1f
         setDotColor(statusDot, if (running) COLOR_RUNNING else COLOR_IDLE)
     }
 

@@ -4,68 +4,73 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/dark_bg"
-    android:fillViewport="true">
+    android:fillViewport="true"
+    android:scrollbars="none">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center">
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="32dp">
 
-        <!-- 图标 -->
+        <!-- ===== 品牌区 ===== -->
         <ImageView
-            android:layout_width="96dp"
-            android:layout_height="96dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:src="@mipmap/ic_launcher"
-            android:layout_marginTop="36dp"
-            android:layout_marginBottom="20dp"/>
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="18dp"
+            android:contentDescription="应用图标" />
 
-        <!-- 标题 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
             android:text="屏幕二维码识别"
             android:textColor="@color/text_primary"
-            android:textSize="26sp"
+            android:textSize="24sp"
             android:textStyle="bold"
-            android:letterSpacing="0.02"
-            android:paddingBottom="8dp"/>
+            android:letterSpacing="0.03" />
 
-        <!-- 副标题 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="后台连续截屏 · 自动识别 · 悬浮窗显示"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:paddingBottom="36dp"/>
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp"
+            android:text="后台持续识别 · 悬浮窗即时显示"
+            android:textColor="@color/text_tertiary"
+            android:textSize="12sp"
+            android:letterSpacing="0.02" />
 
-        <!-- 状态卡片 -->
+        <!-- ===== 状态卡片 ===== -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="24dp"
             app:cardBackgroundColor="@color/card_bg"
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp"
             app:strokeWidth="1dp"
-            app:strokeColor="#14FFFFFF"
-            android:layout_marginBottom="24dp">
+            app:strokeColor="@color/card_stroke">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:padding="20dp">
 
-                <!-- 状态圆点 -->
+                <!-- 呼吸状态点 -->
                 <View
                     android:id="@+id/statusDot"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:background="@drawable/status_dot"
-                    android:layout_marginEnd="12dp"/>
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_marginEnd="16dp"
+                    android:background="@drawable/status_dot" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -78,73 +83,97 @@
                         android:layout_height="wrap_content"
                         android:text="当前状态"
                         android:textColor="@color/text_tertiary"
-                        android:textSize="12sp"/>
+                        android:textSize="11sp"
+                        android:letterSpacing="0.06" />
 
                     <TextView
                         android:id="@+id/statusText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="状态：未启动"
+                        android:layout_marginTop="4dp"
+                        android:text="未启动"
                         android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="4dp"/>
+                        android:textSize="19sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/statusSub"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="点击启动，授予权限后开始识别"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- 启动按钮（渐变） -->
+        <!-- ===== 主操作按钮 ===== -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/startBtn"
             android:layout_width="match_parent"
-            android:layout_height="58dp"
+            android:layout_height="56dp"
             android:text="启动连续识别"
-            android:textSize="17sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             android:textColor="@color/dark_bg"
             android:background="@drawable/btn_gradient"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             app:backgroundTint="@null"
-            app:cornerRadius="18dp"
+            app:cornerRadius="16dp"
             app:icon="@android:drawable/ic_media_play"
             app:iconGravity="textStart"
-            app:iconPadding="8dp"/>
+            app:iconPadding="8dp"
+            app:iconTint="@color/dark_bg" />
 
-        <!-- 停止按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/stopBtn"
+        <!-- ===== 次级操作 ===== -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="停止"
-            android:textSize="16sp"
-            android:textColor="@color/text_secondary"
-            android:background="@drawable/btn_outline"
-            app:backgroundTint="@null"
-            app:cornerRadius="18dp"
-            android:layout_marginTop="12dp"/>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
 
-        <!-- 设置按钮 -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settingsBtn"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="设置"
-            android:textSize="16sp"
-            android:textColor="@color/text_secondary"
-            android:background="@drawable/btn_outline"
-            app:backgroundTint="@null"
-            app:cornerRadius="18dp"
-            android:layout_marginTop="12dp"/>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/stopBtn"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:text="停止"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:background="@drawable/btn_outline"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:backgroundTint="@null"
+                app:cornerRadius="16dp" />
 
-        <!-- 底部说明 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/settingsBtn"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:text="设置"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:background="@drawable/btn_outline"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                app:backgroundTint="@null"
+                app:cornerRadius="16dp" />
+        </LinearLayout>
+
+        <!-- ===== 底部说明 ===== -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="需要授予悬浮窗权限和屏幕录制权限"
-            android:textColor="@color/text_tertiary"
-            android:textSize="12sp"
+            android:layout_marginTop="28dp"
             android:gravity="center"
-            android:layout_marginTop="36dp"
-            android:layout_marginBottom="24dp"/>
+            android:lineSpacingExtra="3dp"
+            android:text="需要「悬浮窗」与「屏幕录制」两项权限\nAndroid 重启后需重新授权一次"
+            android:textColor="@color/text_tertiary"
+            android:textSize="11sp" />
 
     </LinearLayout>
 </ScrollView>
