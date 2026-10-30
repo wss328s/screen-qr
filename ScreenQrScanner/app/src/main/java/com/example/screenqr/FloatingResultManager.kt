@@ -13,12 +13,15 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import kotlin.math.abs
 
 /**
  * 常驻悬浮窗：显示扫码内容列表。
@@ -29,6 +32,8 @@ object FloatingResultManager {
     private var soundPool: SoundPool? = null
     private var beepId: Int = 0
     private var loadedBeepId: Int = 0
+    // 悬浮窗布局参数（拖拽移动时更新 x/y）
+    private var layoutParams: WindowManager.LayoutParams? = null
 
     private fun initSound(ctx: Context) {
         if (soundPool != null) return
@@ -97,6 +102,10 @@ object FloatingResultManager {
                 x = 10
                 y = 100
             }
+            layoutParams = params
+
+            // 拖拽移动悬浮窗（只在真正拖动时消费事件，不影响按钮点击）
+            attachDragListener(ctx, view, params)
 
             try {
                 wm.addView(view, params)
@@ -175,6 +184,69 @@ object FloatingResultManager {
 
     private fun dp(ctx: Context, value: Float): Float =
         value * ctx.resources.displayMetrics.density
+
+    /**
+     * 给悬浮窗根视图挂拖拽监听：按住空白处拖动可移动位置。
+     * DOWN 时判断按点是否落在按钮上：落在按钮则放行（返回 false，让按钮 onClick 生效）；
+     * 落在空白则消费（返回 true），后续 MOVE 更新位置，实现拖拽。
+     */
+    private fun attachDragListener(ctx: Context, view: View, params: WindowManager.LayoutParams) {
+        val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val touchSlop = ViewConfiguration.get(ctx).scaledTouchSlop
+        val copyBtn = view.findViewById<Button>(R.id.copyBtn)
+        val closeBtn = view.findViewById<Button>(R.id.closeBtn)
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+
+        view.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    // 按在按钮上 → 不消费，交给按钮处理点击
+                    if (isPointOnView(copyBtn, event) || isPointOnView(closeBtn, event)) {
+                        dragging = false
+                        return@setOnTouchListener false
+                    }
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    dragging = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.rawX - downRawX
+                    val dy = event.rawY - downRawY
+                    if (!dragging && (abs(dx) > touchSlop.toFloat() || abs(dy) > touchSlop.toFloat())) {
+                        dragging = true
+                    }
+                    if (dragging) {
+                        params.x = startX + dx.toInt()
+                        params.y = startY + dy.toInt()
+                        try { wm.updateViewLayout(view, params) } catch (_: Exception) {}
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    dragging = false
+                    true
+                }
+                else -> true
+            }
+        }
+    }
+
+    /** 判断触摸点是否落在指定视图的屏幕区域内 */
+    private fun isPointOnView(target: View, event: MotionEvent): Boolean {
+        val loc = IntArray(2)
+        target.getLocationOnScreen(loc)
+        val x = event.rawX.toInt()
+        val y = event.rawY.toInt()
+        return x >= loc[0] && x <= loc[0] + target.width &&
+            y >= loc[1] && y <= loc[1] + target.height
+    }
 
     fun notifyRead(ctx: Context) {
         // 震动

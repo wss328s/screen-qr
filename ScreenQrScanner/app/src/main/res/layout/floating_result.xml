@@ -8,7 +8,7 @@
     android:layout_height="wrap_content"
     android:maxWidth="320dp">
 
-    <!-- 标题栏：识别结果 -->
+    <!-- 标题栏：识别结果 + 复制（右上角小按钮） -->
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -25,12 +25,11 @@
             android:textColor="#B0FFFFFF"
             android:letterSpacing="0.05"/>
 
-        <!-- 重置按钮（右上角小按钮） -->
         <Button
-            android:id="@+id/closeBtn"
+            android:id="@+id/copyBtn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="重置"
+            android:text="复制"
             android:textSize="11sp"
             android:textColor="#FFFFFFFF"
             android:minWidth="0dp"
@@ -55,12 +54,12 @@
         android:paddingBottom="10dp"
         android:maxLines="12"/>
 
-    <!-- 底部：复制按钮 -->
+    <!-- 底部：重置按钮 -->
     <Button
-        android:id="@+id/copyBtn"
+        android:id="@+id/closeBtn"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="复制全部"
+        android:text="重置"
         android:textSize="12sp"
         android:textColor="#FF000000"
         android:minWidth="0dp"
