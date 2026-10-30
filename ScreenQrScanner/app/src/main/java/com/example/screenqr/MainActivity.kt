@@ -125,7 +125,7 @@ class MainActivity : AppCompatActivity() {
     private fun setDotColor(view: View, color: Int) {
         val bg = view.background
         if (bg is GradientDrawable) {
-            bg.mutate().setColor(color)
+            bg.setColor(color)
         }
     }
 }
