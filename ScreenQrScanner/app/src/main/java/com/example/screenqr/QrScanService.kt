@@ -41,6 +41,11 @@ class QrScanService : Service() {
         // 快速档目标宽度：小图先跑，像素少→快；清晰码在此命中
         private const val FAST_DECODE_WIDTH = 720
 
+        // ROI 放大解码的目标边长：裁出码区域后放大到该尺寸再解码（远处小码的关键）
+        private const val ROI_UPSCALE_TARGET = 900
+        // 预筛（定位图案检测）所用工作图宽度：越小越快
+        private const val PRESCAN_WIDTH = 480
+
         @Volatile
         var isRunning = false
             private set
@@ -239,11 +244,22 @@ class QrScanService : Service() {
             // 3) 速率门：未到间隔则跳过，避免密集提取/解码
             if (!shouldDispatch(now, interval)) return
 
-            // 4) 源帧一次性拷贝（两级解码复用，不重复拷全屏）
+            // 4) 源帧一次性拷贝（后续所有裁剪复用同一份）
             FrameExtractor.copySource(srcBuffer)
             val bounds = SettingsManager.getRegionBounds(this)
 
-            // 5) 第一级：小图 + 最快配置（清晰正向码在此命中，耗时最低）
+            // ===== 第 0 级：定位图案预筛 + ROI 定向解码（最快路径，专治远处小码）=====
+            // 思路与竞品一致：先用极廉价的游程扫描找出二维码的 3 个定位角，
+            // 再只裁剪这一小块并放大后解码。相比全屏盲解：
+            //   - 面积小一个数量级 → 快
+            //   - 放大后模块变大 → 远处小码也能解
+            val roiHit = tryRoiDecode(srcRowStride, pixelStride, imgW, imgH, bounds)
+            if (roiHit != null) {
+                processResult(roiHit)
+                return
+            }
+
+            // ===== 第 1 级：小图快速档（清晰、正对镜头的码）=====
             val smallMax = if (scaleWidth > 0) minOf(scaleWidth, FAST_DECODE_WIDTH) else FAST_DECODE_WIDTH
             val small = FrameExtractor.extract(
                 srcRowStride, pixelStride, imgW, imgH, bounds, smallMax
@@ -257,7 +273,7 @@ class QrScanService : Service() {
                 }
             }
 
-            // 6) 第二级：仅在突发期（新码可能出现）或非关闭档，用全图 + 重配置
+            // ===== 第 2 级：全图重档（模糊/倾斜/反色/背光，最后兜底）=====
             val doHeavy = now < burstUntilElapsed || enhanceMode != SettingsManager.ENHANCE_OFF
             if (doHeavy) {
                 val largeMax = if (scaleWidth > 0) scaleWidth else MAX_DECODE_WIDTH
@@ -279,6 +295,71 @@ class QrScanService : Service() {
             // 单帧处理异常不应中断服务；记录到日志便于排查
             android.util.Log.w(TAG, "handleFrame error: ${e.message}")
         }
+    }
+
+    /**
+     * ROI 定向解码（核心提速路径）。
+     *
+     * 流程：低分辨率预扫 → 定位图案检测 → 求解二维码矩形 → 裁剪 + 放大 → 解码。
+     * 全程复用 [FrameExtractor] 的源帧拷贝，不额外分配整帧内存。
+     */
+    private fun tryRoiDecode(
+        srcRowStride: Int,
+        pixelStride: Int,
+        imgW: Int,
+        imgH: Int,
+        bounds: FloatArray
+    ): QrDecoder.DecodeResult? {
+        // 预扫图：整屏缩到 PRESCAN_WIDTH 宽，检测定位图案
+        val prescan = FrameExtractor.extract(
+            srcRowStride, pixelStride, imgW, imgH, bounds, PRESCAN_WIDTH
+        ) ?: return null
+        if (prescan.width < 32 || prescan.height < 32) return null
+
+        prescan.gray.rewind()
+        val detect = FindPatternDetector.detect(
+            prescan.gray, prescan.rowStride, prescan.width, prescan.height
+        )
+        if (detect.isEmpty) return null
+
+        // 预扫图坐标 → 源图坐标的缩放比
+        val roiW = ((bounds[2] - bounds[0]) * imgW)
+        val roiH = ((bounds[3] - bounds[1]) * imgH)
+        if (roiW < 1f || roiH < 1f) return null
+        val sx = roiW / prescan.width
+        val sy = roiH / prescan.height
+        val offX = bounds[0] * imgW
+        val offY = bounds[1] * imgH
+
+        val rect = QrRegionSolver.solve(detect.candidates, prescan.width, prescan.height) ?: return null
+
+        // 映射回源图，并留一点余量（求解器已含 padding，这里再加 1.15 倍更稳）
+        val padFactor = 1.18f
+        val cx = (rect.left + rect.right) / 2f
+        val cy = (rect.top + rect.bottom) / 2f
+        val halfW = rect.width / 2f * padFactor
+        val halfH = rect.height / 2f * padFactor
+
+        val srcLeft = (offX + (cx - halfW) * sx).toInt()
+        val srcTop = (offY + (cy - halfH) * sy).toInt()
+        val srcRight = (offX + (cx + halfW) * sx).toInt()
+        val srcBottom = (offY + (cy + halfH) * sy).toInt()
+
+        // 裁剪并放大到 ROI_UPSCALE_TARGET，让小码模块足够大
+        val crop = FrameExtractor.extractRect(
+            srcRowStride, pixelStride, imgW, imgH,
+            srcLeft, srcTop, srcRight, srcBottom,
+            ROI_UPSCALE_TARGET, upscale = true
+        ) ?: return null
+
+        crop.gray.rewind()
+        // ROI 已经是精确区域，直接用标准档解码即可（避免 heavy 的额外开销）
+        val hit = QrDecoder.decodeFast(crop.gray, crop.rowStride, crop.width, crop.height)
+        if (hit != null) return hit
+
+        // ROI 快速档未中，再用重档在该小区域上重试一次（区域内解码仍然很快）
+        crop.gray.rewind()
+        return QrDecoder.decodeHeavy(crop.gray, crop.rowStride, crop.width, crop.height, enhanceMode)
     }
 
     /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈（含活码联网解析） */
