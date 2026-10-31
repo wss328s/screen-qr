@@ -274,11 +274,12 @@ class QrScanService : Service() {
     /**
      * 解码一帧，返回识别到的所有码（多码逐个返回）。
      *
-     * 策略（关键：不破坏 v2.3 已验证的活码能力）：
-     * - 先跑 zxing 全图 3540（v2.3 核心）：URL 活码/密集长码由 zxing 解最准、最干净，
-     *   微信引擎（JavaCV）在真机上对活码返回的文本可能带污染字符，导致联网解析失败；
-     * - zxing 解出活码 URL 时**直接返回**，不再跑微信（活码场景以 zxing 为准）；
-     * - 数字码/清晰码：再用微信 CNN 引擎增强（数字码解得更稳定）。
+     * 策略（速度 + 多码 + 去重兼顾）：
+     * - 微信 CNN 引擎**多码优先**：数字码解得更稳定（去重按数值才能稳定），
+     *   且 detectAndDecode 原生返回多码；
+     * - 微信**完全未解出任何码**时，用 zxing 全图 3540 多码兜底：
+     *   微信 CNN 检测器对「内容长、模块密集」的 URL 活码召回率低，zxing 能解出；
+     * - 活码 URL 在 processResult 里经 extractUrl 清洗不可见字符（已修复历史 URI 崩溃）。
      */
     private fun decodeFrame(
         srcRowStride: Int,
@@ -286,31 +287,26 @@ class QrScanService : Service() {
         imgW: Int,
         imgH: Int
     ): List<QrDecoder.DecodeResult> {
-        // 1) zxing 全图 3540 优先（活码/密集码最准，恢复 v2.3 能力）
-        val zx = decodeByZxing(srcRowStride, pixelStride, imgW, imgH)
-        if (zx != null && LiveCodeResolver.isLiveCode(zx.text)) {
-            return listOf(zx)
-        }
-        // 2) 数字码/未解出：微信 CNN 引擎增强
+        // 1) 微信多码优先（数字码稳定、多码，命中即返回，速度最快）
         val wechatHits = decodeByWechat(srcRowStride, pixelStride, imgW, imgH)
         if (wechatHits.isNotEmpty()) return wechatHits
-        // 3) 微信也没解出：回退 zxing 的非活码结果（若有）
-        return if (zx != null) listOf(zx) else emptyList()
+        // 2) 微信未解出：zxing 全图 3540 多码兜底（密集 URL 活码等）
+        return decodeByZxingMulti(srcRowStride, pixelStride, imgW, imgH)
     }
 
-    /** 全图 zxing-cpp 放大解码（兜底：活码 URL 等微信检测器漏掉的密集码） */
-    private fun decodeByZxing(
+    /** 全图 zxing-cpp 多码解码（兜底：活码 URL 等微信检测器漏掉的密集码；多码不漏） */
+    private fun decodeByZxingMulti(
         srcRowStride: Int,
         pixelStride: Int,
         imgW: Int,
         imgH: Int
-    ): QrDecoder.DecodeResult? {
+    ): List<QrDecoder.DecodeResult> {
         val scaled = FrameExtractor.extractToWidth(
             srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, DECODE_WIDTH, slot = 1
-        ) ?: return null
-        if (isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) return null
+        ) ?: return emptyList()
+        if (isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) return emptyList()
         scaled.gray.rewind()
-        return QrDecoder.decodeFast(scaled.gray, scaled.rowStride, scaled.width, scaled.height)
+        return QrDecoder.decodeFastMulti(scaled.gray, scaled.rowStride, scaled.width, scaled.height)
     }
 
     /** 微信 CNN 引擎解码（缩放到合适尺寸后交给微信），返回多个码的列表 */
@@ -325,10 +321,10 @@ class QrScanService : Service() {
             wechatInited = true
         }
         // 微信内部会自己做多尺度（0.5x/1x/2x）+超分，这里只需提供灰度原图。
-        // 活码（URL）码内容长、模块密集，1280 宽下微信检测器可能漏检，
-        // 提高到 1920 宽可提升密集活码的识别率。
+        // 数字码用 1280 宽足够且更快；密集 URL 活码微信检测器召回率低，
+        // 交给 zxing 全图 3540 多码兜底，所以微信无需提高宽度。
         val frame = FrameExtractor.extractToWidth(
-            srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, 1920, slot = 2
+            srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, 1280, slot = 2
         ) ?: return emptyList()
         val bytes = ByteArray(frame.width * frame.height)
         frame.gray.rewind()

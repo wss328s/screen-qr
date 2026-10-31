@@ -41,11 +41,22 @@ object ScanHistory {
     fun endLive() { liveLoadingCount = maxOf(0, liveLoadingCount - 1) }
 
     /**
+     * 归一化：去不可见字符（零宽/BOM/软连字符/NBSP/控制字符）+ 折叠空白。
+     * 两引擎/活码对同一内容可能返回格式差异，归一化后作为去重 key，避免重复记录。
+     */
+    private fun normalize(raw: String): String {
+        return raw
+            .replace(Regex("[\\x00-\\x1F\\x7F\\u200B-\\u200F\\u2028\\u2029\\uFEFF\\u00A0\\u00AD]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+    }
+
+    /**
      * 加到历史：同一内容在重置前只加一次。
      * 返回 true 表示这是新内容（历史里没有）。
      */
     fun add(raw: String): Boolean {
-        val s = raw.trim()
+        val s = normalize(raw)
         if (s.isEmpty()) return false
 
         if (historySet.contains(s)) return false
@@ -65,7 +76,7 @@ object ScanHistory {
      * 返回 true 表示应该反馈。
      */
     fun shouldNotify(raw: String, ttlMs: Long): Boolean {
-        val s = raw.trim()
+        val s = normalize(raw)
         if (s.isEmpty()) return false
 
         val now = System.currentTimeMillis()

@@ -55,6 +55,37 @@ object QrDecoder {
         return runDecode(gray, rowStride, width, height)
     }
 
+    /**
+     * 全屏多码快速档：与 decodeFast 同参数，但一次性解出画面里的所有码
+     * （图传画面里常同时出现 2~3 个码，单码会漏识别）。
+     */
+    fun decodeFastMulti(
+        gray: ByteBuffer,
+        rowStride: Int,
+        width: Int,
+        height: Int
+    ): List<DecodeResult> {
+        val options = BarcodeReader.Options(
+            formats = setOf(BarcodeReader.Format.QR_CODE),
+            tryHarder = false,
+            tryRotate = true,
+            tryInvert = true,
+            tryDownscale = true,
+            tryDenoise = false,
+            binarizer = BarcodeReader.Binarizer.LOCAL_AVERAGE,
+            maxNumberOfSymbols = 16,
+            textMode = BarcodeReader.TextMode.PLAIN
+        )
+        reader.options = options
+        return try {
+            reader.readGray(gray, rowStride, width, height)
+                .filter { !it.text.isNullOrBlank() }
+                .map { DecodeResult(it.text!!) }
+        } catch (e: Throwable) {
+            emptyList()
+        }
+    }
+
     /** 重档：快速档未命中时调用，覆盖各种困难情况。 */
     fun decodeHeavy(
         gray: ByteBuffer,

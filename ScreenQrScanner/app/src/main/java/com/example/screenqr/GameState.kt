@@ -25,8 +25,10 @@ object GameState {
         private set
     var totalRead = 0
         private set
-    // 永久去重：重置前同一码只记录一次
-    private val seenCodes = mutableSetOf<String>()
+    // 永久去重：按「提取出的数值」去重（而非原始字符串）。
+    // 活码/死码/两引擎对同一数字码可能返回不同格式（前导零/空格/换行），
+    // 按数值去重才能避免同一码因格式差异被重复记录。
+    private val seenValues = mutableSetOf<Int>()
     // 正在联网解析的活码数量（loading 提示）
     var liveLoadingCount = 0
         private set
@@ -38,7 +40,7 @@ object GameState {
         legs.forEach { it.codes.clear() }
         currentLegIndex = 0
         totalRead = 0
-        seenCodes.clear()
+        seenValues.clear()
         liveLoadingCount = 0
         lastLiveError = null
     }
@@ -48,13 +50,16 @@ object GameState {
     fun beginLive() { liveLoadingCount++ }
     fun endLive() { if (liveLoadingCount > 0) liveLoadingCount-- }
 
-    fun parseAndRecord(raw: String): Boolean {
-        val s = raw.trim()
-        val numStr = Regex("\\d+").find(s)?.value ?: return false
-        val value = numStr.toIntOrNull() ?: return false
+    /** 从文本里提取首个数值（活码解析出的正文/死码原文里的数字） */
+    private fun extractValue(s: String): Int? {
+        return Regex("\\d+").find(s.trim())?.value?.toIntOrNull()
+    }
 
-        // 永久去重
-        if (seenCodes.contains(s)) return false
+    fun parseAndRecord(raw: String): Boolean {
+        val value = extractValue(raw) ?: return false
+
+        // 永久去重（按数值）
+        if (seenValues.contains(value)) return false
 
         if (currentLegIndex >= 3 && legs[3].isComplete) return false
         val leg = legs[currentLegIndex]
@@ -62,7 +67,7 @@ object GameState {
 
         leg.codes.add(value)
         totalRead++
-        seenCodes.add(s)
+        seenValues.add(value)
 
         if (leg.isComplete && currentLegIndex < 3) {
             currentLegIndex++
