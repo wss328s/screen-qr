@@ -60,6 +60,9 @@ object LiveCodeResolver {
     fun extractUrl(text: String): String {
         val m = urlExtractRegex.find(text.trim())
         var u = m?.value ?: text.trim()
+        // 关键：去掉引擎可能带入的不可见字符（零宽空格/BOM/软连字符/NBSP/控制字符）。
+        // 这些字符肉眼不可见，但会让 java.net.URI 解析直接抛异常，导致活码"静默失败"。
+        u = u.replace(Regex("[\\x00-\\x1F\\x7F\\u200B-\\u200F\\u2028\\u2029\\uFEFF\\u00A0\\u00AD]"), "")
         // 去掉常见包裹/标点污染（HRI 前缀后的引号、括号、逗号句号等）
         u = u.trimEnd(')', ']', '}', '>', ',', ';', ':', '.', '\'', '"', '。', '，', '、')
         return u
@@ -106,11 +109,18 @@ object LiveCodeResolver {
         // 关键：不再依赖 isCaoliao 判断（真机扫出的 URL 可能带污染字符导致判断失败）。
         // 草料活码最可靠路径是 ?format=md 端点（直接返回正文文本），所以**先试 markdown**，
         // 失败（非草料/404）再回退通用网页抓取。
-        var content = fetchCaoliao(url)
-        var caoliao = content != null
-        if (content.isNullOrBlank()) {
-            content = fetchGeneric(url)
+        var content: String? = null
+        try {
+            content = fetchCaoliao(url)
+            if (content.isNullOrBlank()) {
+                content = fetchGeneric(url)
+            }
+        } catch (e: Throwable) {
+            // 任何异常（含历史 URI 解析异常）都记录，避免"静默失败"只留"开始解析"
+            lastStatus = "异常: ${e.javaClass.simpleName}: ${e.message}"
+            android.util.Log.w(TAG, "resolve exception url=$url : $lastStatus")
         }
+        val caoliao = content != null
         if (content.isNullOrBlank()) {
             android.util.Log.w(TAG, "resolve fail url=$url status=$lastStatus detail=$lastDetail")
             return null
@@ -134,9 +144,14 @@ object LiveCodeResolver {
     // ---- 草料 ----
 
     private fun markdownUrl(url: String): String {
-        val uri = URI(url)
-        // scheme, host, path, query(format=md), fragment
-        return URI("https", uri.host, uri.path, "format=md", null).toASCIIString()
+        // 纯字符串拼接，不用 java.net.URI —— URI 对 URL 里的不可见字符会抛异常，
+        // 曾导致活码解析在发起请求前就中断（表现为状态停留在"开始解析"）。
+        var u = url.substringBefore('#')
+        u = u.substringBefore('?')          // 草料短链本无 query，丢弃避免拼接出错
+        if (u.startsWith("http://", ignoreCase = true)) {
+            u = "https://" + u.substring(7)
+        }
+        return "$u?format=md"
     }
 
     private fun fetchCaoliao(url: String): String? {
