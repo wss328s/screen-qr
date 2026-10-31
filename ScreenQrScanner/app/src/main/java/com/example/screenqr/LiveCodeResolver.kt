@@ -103,17 +103,16 @@ object LiveCodeResolver {
         if (!fresh) {
             cache[url]?.let { if (now - it.time < CACHE_TTL_MS) return it.result }
         }
-        val caoliao = isCaoliao(url)
-        var content = if (caoliao) fetchCaoliao(url) else fetchGeneric(url)
-        // 兜底：通用网页抓取失败（活码落地页常是 JS 渲染，提取不到内容）时，
-        // 无条件尝试草料 markdown 端点（?format=md）。对草料域名有效；非草料域名
-        // 会返回 404/非 markdown，parse 失败返回 null，无害。
-        if (content.isNullOrBlank() && !caoliao) {
-            android.util.Log.i(TAG, "generic failed, trying markdown endpoint: $url")
-            content = fetchCaoliao(url)
+        // 关键：不再依赖 isCaoliao 判断（真机扫出的 URL 可能带污染字符导致判断失败）。
+        // 草料活码最可靠路径是 ?format=md 端点（直接返回正文文本），所以**先试 markdown**，
+        // 失败（非草料/404）再回退通用网页抓取。
+        var content = fetchCaoliao(url)
+        var caoliao = content != null
+        if (content.isNullOrBlank()) {
+            content = fetchGeneric(url)
         }
         if (content.isNullOrBlank()) {
-            android.util.Log.w(TAG, "resolve fail url=$url caoliao=$caoliao status=$lastStatus detail=$lastDetail")
+            android.util.Log.w(TAG, "resolve fail url=$url status=$lastStatus detail=$lastDetail")
             return null
         }
         val r = LiveResult(url, content, caoliao)
