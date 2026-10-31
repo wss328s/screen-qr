@@ -92,6 +92,9 @@ class QrScanService : Service() {
     private var screenH = 0
     private var density = 0
 
+    // 微信引擎是否已初始化（惰性加载，首次解码时才加载模型）
+    @Volatile private var wechatInited = false
+
     // 诊断计数（后台线程写、主线程读，用 @Volatile 保证可见性）
     @Volatile private var frameCount = 0
     @Volatile private var qrCount = 0
@@ -257,23 +260,76 @@ class QrScanService : Service() {
             // 4) 源帧一次性拷贝
             FrameExtractor.copySource(srcBuffer)
 
-            // 5) 单级：全屏 × 3540 放大解码（LocalAverage + tryDownscale + 旋转/反色）
-            val scaled = FrameExtractor.extractToWidth(
-                srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, DECODE_WIDTH, slot = 1
-            )
-            if (scaled != null && !isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) {
-                scaled.gray.rewind()
-                val hit = QrDecoder.decodeFast(
-                    scaled.gray, scaled.rowStride, scaled.width, scaled.height
-                )
-                if (hit != null) {
-                    processResult(hit)
-                }
+            // 5) 解码：微信 CNN 引擎优先，未解出再用全图 zxing 兜底
+            val hits = decodeFrame(srcRowStride, pixelStride, imgW, imgH)
+            for (hit in hits) {
+                processResult(hit)
             }
         } catch (e: Exception) {
             // 单帧处理异常不应中断服务；记录到日志便于排查
             android.util.Log.w(TAG, "handleFrame error: ${e.message}")
         }
+    }
+
+    /**
+     * 解码一帧，返回识别到的所有码（多码逐个返回）。
+     *
+     * - 微信引擎（CNN 定位 + zxing 解码 + 超分）：对数字码/清晰码最优
+     * - 微信**完全未解出任何码**时，才用全图 zxing 兜底：
+     *   微信的 CNN 检测器对「内容长、模块密集」的 URL 活码召回率低，
+     *   而全图 zxing 能直接解出这类码。
+     * 这样每个码最多被一个引擎处理，不会出现两引擎同一码输出不一致的问题。
+     */
+    private fun decodeFrame(
+        srcRowStride: Int,
+        pixelStride: Int,
+        imgW: Int,
+        imgH: Int
+    ): List<QrDecoder.DecodeResult> {
+        val wechatHits = decodeByWechat(srcRowStride, pixelStride, imgW, imgH)
+        if (wechatHits.isNotEmpty()) return wechatHits
+        // 微信没解出，用全图 zxing 兜底（活码 URL 等密集码）
+        val zx = decodeByZxing(srcRowStride, pixelStride, imgW, imgH)
+        return if (zx != null) listOf(zx) else emptyList()
+    }
+
+    /** 全图 zxing-cpp 放大解码（兜底：活码 URL 等微信检测器漏掉的密集码） */
+    private fun decodeByZxing(
+        srcRowStride: Int,
+        pixelStride: Int,
+        imgW: Int,
+        imgH: Int
+    ): QrDecoder.DecodeResult? {
+        val scaled = FrameExtractor.extractToWidth(
+            srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, DECODE_WIDTH, slot = 1
+        ) ?: return null
+        if (isFrameFlat(scaled.gray, scaled.width, scaled.height, scaled.rowStride)) return null
+        scaled.gray.rewind()
+        return QrDecoder.decodeFast(scaled.gray, scaled.rowStride, scaled.width, scaled.height)
+    }
+
+    /** 微信 CNN 引擎解码（缩放到合适尺寸后交给微信），返回多个码的列表 */
+    private fun decodeByWechat(
+        srcRowStride: Int,
+        pixelStride: Int,
+        imgW: Int,
+        imgH: Int
+    ): List<QrDecoder.DecodeResult> {
+        if (!wechatInited) {
+            WechatQrDecoder.ensureLoaded(this)
+            wechatInited = true
+        }
+        // 微信内部会自己做多尺度（0.5x/1x/2x）+超分，这里只需提供灰度原图。
+        // 活码（URL）码内容长、模块密集，1280 宽下微信检测器可能漏检，
+        // 提高到 1920 宽可提升密集活码的识别率。
+        val frame = FrameExtractor.extractToWidth(
+            srcRowStride, pixelStride, imgW, imgH, FULL_BOUNDS, 1920, slot = 2
+        ) ?: return emptyList()
+        val bytes = ByteArray(frame.width * frame.height)
+        frame.gray.rewind()
+        frame.gray.get(bytes)
+        val texts = WechatQrDecoder.decode(bytes, frame.width, frame.height)
+        return texts.map { QrDecoder.DecodeResult(it) }
     }
 
     /** 处理一个解码结果：按模式记录并刷新悬浮窗/反馈（含活码联网解析） */

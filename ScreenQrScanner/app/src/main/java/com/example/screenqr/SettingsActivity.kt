@@ -35,6 +35,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var liveCodeValue: TextView
     private lateinit var soundValue: TextView
     private lateinit var deviceInfo: TextView
+    private lateinit var engineStatus: TextView
+    private lateinit var engineDetail: TextView
 
     companion object {
         private const val REQ_OVERLAY = 2001
@@ -64,6 +66,8 @@ class SettingsActivity : AppCompatActivity() {
         liveCodeSwitch = findViewById(R.id.liveCodeSwitch)
         liveCodeValue = findViewById(R.id.liveCodeValue)
         deviceInfo = findViewById(R.id.deviceInfo)
+        engineStatus = findViewById(R.id.engineStatus)
+        engineDetail = findViewById(R.id.engineDetail)
 
         // 悬浮窗权限申请
         findViewById<MaterialCardView>(R.id.overlayPermCard).setOnClickListener {
@@ -223,6 +227,28 @@ class SettingsActivity : AppCompatActivity() {
 
         // 设备信息
         deviceInfo.text = buildDeviceInfo()
+
+        // 识别引擎状态
+        refreshEngineStatus()
+    }
+
+    /** 显示识别引擎状态（微信版用于排查引擎是否正常加载） */
+    private fun refreshEngineStatus() {
+        val flavor = BuildConfig.FLAVOR
+        when (flavor) {
+            "wechat" -> {
+                engineStatus.text = "微信引擎 · ${WechatQrDecoder.lastStatus}"
+                engineDetail.text = "当前为纯微信QRCode引擎。若状态显示「加载失败」，说明模型或JNI库有问题。"
+            }
+            "dual" -> {
+                engineStatus.text = "双引擎 · 微信优先 + zxing 兜底"
+                engineDetail.text = "先走微信CNN引擎解码，完全未解出时再用全图 zxing-cpp 兜底。"
+            }
+            else -> {
+                engineStatus.text = "zxing-cpp 引擎"
+                engineDetail.text = "native zxing-cpp 单级解码。"
+            }
+        }
     }
 
     private fun buildDeviceInfo(): String {
