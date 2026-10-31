@@ -274,11 +274,11 @@ class QrScanService : Service() {
     /**
      * 解码一帧，返回识别到的所有码（多码逐个返回）。
      *
-     * - 微信引擎（CNN 定位 + zxing 解码 + 超分）：对数字码/清晰码最优
-     * - 微信**完全未解出任何码**时，才用全图 zxing 兜底：
-     *   微信的 CNN 检测器对「内容长、模块密集」的 URL 活码召回率低，
-     *   而全图 zxing 能直接解出这类码。
-     * 这样每个码最多被一个引擎处理，不会出现两引擎同一码输出不一致的问题。
+     * 策略（关键：不破坏 v2.3 已验证的活码能力）：
+     * - 先跑 zxing 全图 3540（v2.3 核心）：URL 活码/密集长码由 zxing 解最准、最干净，
+     *   微信引擎（JavaCV）在真机上对活码返回的文本可能带污染字符，导致联网解析失败；
+     * - zxing 解出活码 URL 时**直接返回**，不再跑微信（活码场景以 zxing 为准）；
+     * - 数字码/清晰码：再用微信 CNN 引擎增强（数字码解得更稳定）。
      */
     private fun decodeFrame(
         srcRowStride: Int,
@@ -286,10 +286,15 @@ class QrScanService : Service() {
         imgW: Int,
         imgH: Int
     ): List<QrDecoder.DecodeResult> {
+        // 1) zxing 全图 3540 优先（活码/密集码最准，恢复 v2.3 能力）
+        val zx = decodeByZxing(srcRowStride, pixelStride, imgW, imgH)
+        if (zx != null && LiveCodeResolver.isLiveCode(zx.text)) {
+            return listOf(zx)
+        }
+        // 2) 数字码/未解出：微信 CNN 引擎增强
         val wechatHits = decodeByWechat(srcRowStride, pixelStride, imgW, imgH)
         if (wechatHits.isNotEmpty()) return wechatHits
-        // 微信没解出，用全图 zxing 兜底（活码 URL 等密集码）
-        val zx = decodeByZxing(srcRowStride, pixelStride, imgW, imgH)
+        // 3) 微信也没解出：回退 zxing 的非活码结果（若有）
         return if (zx != null) listOf(zx) else emptyList()
     }
 
@@ -339,7 +344,7 @@ class QrScanService : Service() {
             val raw = result.text
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
                 // 活码：联网解析真实内容，再从真实内容提取数字（短链本身没有有效数字）
-                val url = raw.trim()
+                val url = LiveCodeResolver.extractUrl(raw)
                 // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
                 if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
@@ -354,9 +359,11 @@ class QrScanService : Service() {
                         // 解析失败：短链域名含数字（qr61→61），兜底会误记，直接丢弃不记录
                         val content = live?.content?.trim()
                         if (content.isNullOrBlank()) {
+                            GameState.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}")
                             mainHandler.post { FloatingResultManager.update(this) }
                             return@execute
                         }
+                        GameState.setLiveError(null)
                         val isNew = GameState.parseAndRecord(content)
                         if (isNew) qrCount++
                         mainHandler.post {
@@ -381,7 +388,7 @@ class QrScanService : Service() {
             val raw = result.text
             if (SettingsManager.getLiveCode(this) && LiveCodeResolver.isLiveCode(raw)) {
                 // 活码（网络二维码）：独立线程联网读取后台真实内容
-                val url = raw.trim()
+                val url = LiveCodeResolver.extractUrl(raw)
                 // 冷却：屏幕上的活码常驻时，同一 URL 3 秒内只解析一次，避免反复 loading/刷新
                 if (!shouldResolveLive(url)) return
                 val dup = synchronized(pendingLive) { pendingLive.contains(url) }
@@ -395,11 +402,17 @@ class QrScanService : Service() {
                         } catch (e: Exception) { null }
                         synchronized(pendingLive) { pendingLive.remove(url) }
                         ScanHistory.endLive()
-                        // 成功显示真实内容，失败兜底显示原始链接
-                        val display = live?.content ?: url
-                        val isNew = ScanHistory.add(display)
+                        // 成功显示真实内容；失败时在悬浮窗显示失败原因（不把 URL 当结果记录）
+                        val content = live?.content
+                        if (content.isNullOrBlank()) {
+                            ScanHistory.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}")
+                            mainHandler.post { FloatingResultManager.update(this) }
+                            return@execute
+                        }
+                        ScanHistory.setLiveError(null)
+                        val isNew = ScanHistory.add(content)
                         if (isNew) qrCount++
-                        val shouldNotify = ScanHistory.shouldNotify(display, dedupTtlMs)
+                        val shouldNotify = ScanHistory.shouldNotify(content, dedupTtlMs)
                         mainHandler.post {
                             FloatingResultManager.update(this)
                             if (shouldNotify) FloatingResultManager.notifyRead(this)

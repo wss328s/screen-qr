@@ -3,7 +3,6 @@ package com.example.screenqr
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 
 /**
  * 活码（网络二维码）解析器。
@@ -20,15 +19,32 @@ import javax.net.ssl.HttpsURLConnection
  */
 object LiveCodeResolver {
 
+    private const val TAG = "LiveCodeResolver"
+    private const val UA =
+        "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+
     data class LiveResult(
         val url: String,
         val content: String,
         val isCaoliao: Boolean
     )
 
+    /** 最近一次解析的状态/失败原因（供设置页排查活码解析失败） */
+    @Volatile
+    var lastStatus: String = "未请求"
+        private set
+
+    /** 最近一次请求的明细（请求URL / 响应码等） */
+    @Volatile
+    var lastDetail: String = ""
+        private set
+
     private val webLinkRegex = Regex("^https?://", RegexOption.IGNORE_CASE)
     private val caoliaoHostRegex = Regex("qr[0-9]+\\.cn", RegexOption.IGNORE_CASE)
     private val caoliaoPathRegex = Regex("/[A-Za-z0-9]+/[A-Za-z0-9]+/?")
+    // 从文本中提取 URL：某些引擎可能给 URL 加 HRI 前缀（如 "]Q1https://..."），
+    // 需要截取从 http(s):// 开始的完整 URL 部分。
+    private val urlExtractRegex = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
 
     /** 文本是否是一个网址（活码候选） */
     fun isLiveCode(text: String): Boolean {
@@ -36,10 +52,19 @@ object LiveCodeResolver {
         return t.isNotEmpty() && webLinkRegex.containsMatchIn(t)
     }
 
+    /** 从原始文本中提取干净的 URL（去掉可能的 HRI 前缀等） */
+    fun extractUrl(text: String): String {
+        val m = urlExtractRegex.find(text.trim())
+        var u = m?.value ?: text.trim()
+        // 去掉常见包裹/标点污染（HRI 前缀后的引号、括号、逗号句号等）
+        u = u.trimEnd(')', ']', '}', '>', ',', ';', ':', '.', '\'', '"', '。', '，', '、')
+        return u
+    }
+
     /** 是否为草料活码链接 */
     fun isCaoliao(text: String): Boolean {
         return try {
-            val uri = URI(text.trim())
+            val uri = URI(extractUrl(text))
             val host = uri.host ?: return false
             val schemeOk = uri.scheme?.equals("https", ignoreCase = true) == true
             val hostOk = caoliaoHostRegex.matches(host)
@@ -56,7 +81,8 @@ object LiveCodeResolver {
      */
     @Synchronized
     fun resolve(text: String, fresh: Boolean = true): LiveResult? {
-        val url = text.trim()
+        val url = extractUrl(text)
+        lastStatus = "开始解析: $url"
         // 短期缓存：同一 URL 在缓存TTL内不重复请求
         val now = System.currentTimeMillis()
         if (!fresh) {
@@ -64,7 +90,10 @@ object LiveCodeResolver {
         }
         val caoliao = isCaoliao(url)
         val content = if (caoliao) fetchCaoliao(url) else fetchGeneric(url)
-        if (content.isNullOrBlank()) return null
+        if (content.isNullOrBlank()) {
+            android.util.Log.w(TAG, "resolve fail url=$url caoliao=$caoliao status=$lastStatus detail=$lastDetail")
+            return null
+        }
         val r = LiveResult(url, content, caoliao)
         cache[url] = CacheEntry(now, r)
         // 控制缓存大小
@@ -72,6 +101,8 @@ object LiveCodeResolver {
             val it = cache.entries.iterator()
             if (it.hasNext()) it.remove()
         }
+        lastStatus = "解析成功: $content"
+        android.util.Log.i(TAG, "resolve ok url=$url content=$content")
         return r
     }
 
@@ -162,35 +193,56 @@ object LiveCodeResolver {
     // ---- 通用网址 ----
 
     private fun fetchGeneric(url: String): String? {
-        // 跟随重定向，拿最终 HTML
-        var conn: HttpURLConnection? = null
-        try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 2000
-                readTimeout = 2000
-                instanceFollowRedirects = true
-                useCaches = false
-                setRequestProperty("Accept", "text/html,text/plain,*/*")
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
-                )
+        // 失败自动重试一次
+        val first = fetchGenericOnce(url)
+        if (first != null) return first
+        return fetchGenericOnce(url)
+    }
+
+    private fun fetchGenericOnce(url: String): String? {
+        // 手动跟随重定向（最多5跳），兼容 Android 默认不跟随的 HTTPS->HTTP 降级跳转
+        var current = url
+        for (hop in 0 until 5) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(current).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    instanceFollowRedirects = false
+                    useCaches = false
+                    setRequestProperty("Accept", "text/html,text/plain,*/*")
+                    setRequestProperty("User-Agent", UA)
+                }
+                val code = conn.responseCode
+                lastDetail = "GET $current -> HTTP $code (hop=$hop)"
+                if (code in 300..399) {
+                    val loc = conn.getHeaderField("Location")
+                    if (loc.isNullOrBlank()) { lastStatus = "重定向缺少Location(HTTP $code)"; return null }
+                    current = URL(URL(current), loc).toString()
+                    continue
+                }
+                if (code !in 200..299) { lastStatus = "HTTP $code"; return null }
+                val ctype = conn.contentType ?: ""
+                val input = conn.inputStream ?: run { lastStatus = "响应体为空"; return null }
+                val raw = input.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                // 限制大小
+                val html = if (raw.length > 200000) raw.substring(0, 200000) else raw
+                val result = when {
+                    ctype.startsWith("text/plain") -> html.trim().take(500)
+                    else -> extractHtmlTitle(html)
+                }
+                lastStatus = if (result.isNullOrBlank()) "未提取到内容(ctype=$ctype)" else "解析成功(${result.length}字符)"
+                return result
+            } catch (e: Exception) {
+                lastStatus = "异常: ${e.javaClass.simpleName}: ${e.message}"
+                android.util.Log.w(TAG, "fetchGeneric fail url=$current : $lastStatus")
+                return null
+            } finally {
+                try { conn?.disconnect() } catch (_: Exception) {}
             }
-            if (conn.responseCode !in 200..299) return null
-            val ctype = conn.contentType ?: ""
-            val input = conn.inputStream ?: return null
-            val raw = input.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            // 限制大小
-            val html = if (raw.length > 200000) raw.substring(0, 200000) else raw
-            return when {
-                ctype.startsWith("text/plain") -> html.trim().take(500)
-                else -> extractHtmlTitle(html)
-            }
-        } catch (e: Exception) {
-            return null
-        } finally {
-            conn?.disconnect()
         }
+        lastStatus = "重定向过多"
+        return null
     }
 
     /** 从 HTML 提取 <title>；没有则取去标签后的首段文本 */
@@ -214,38 +266,62 @@ object LiveCodeResolver {
     // ---- 通用 HTTP GET ----
 
     private fun httpGet(urlStr: String, accept: String): String? {
-        var conn: HttpsURLConnection? = null
-        try {
-            conn = (URL(urlStr).openConnection() as HttpsURLConnection).apply {
-                connectTimeout = 2000
-                readTimeout = 2000
-                instanceFollowRedirects = false
-                useCaches = false
-                setRequestProperty("Accept", accept)
-                setRequestProperty("Cache-Control", "no-cache, no-store")
-                setRequestProperty("Pragma", "no-cache")
+        // 失败自动重试一次（现场网络抖动/超时是解析失败的主因）
+        val first = httpGetOnce(urlStr, accept)
+        if (first != null) return first
+        return httpGetOnce(urlStr, accept)
+    }
+
+    private fun httpGetOnce(urlStr: String, accept: String): String? {
+        // 手动跟随重定向（最多5跳），兼容 Android 默认不跟随的 HTTPS->HTTP 降级跳转
+        var current = urlStr
+        for (hop in 0 until 5) {
+            var conn: HttpURLConnection? = null
+            try {
+                conn = (URL(current).openConnection() as HttpURLConnection).apply {
+                    // 现场手机网络较慢，超时从 2s 提到 6s，避免误判失败
+                    connectTimeout = 6000
+                    readTimeout = 6000
+                    instanceFollowRedirects = false
+                    useCaches = false
+                    setRequestProperty("Accept", accept)
+                    setRequestProperty("Cache-Control", "no-cache, no-store")
+                    setRequestProperty("Pragma", "no-cache")
+                    // 部分 CDN/服务会拦截无 UA 请求
+                    setRequestProperty("User-Agent", UA)
+                }
+                val code = conn.responseCode
+                lastDetail = "GET $current -> HTTP $code (hop=$hop)"
+                if (code in 300..399) {
+                    val loc = conn.getHeaderField("Location")
+                    if (loc.isNullOrBlank()) { lastStatus = "重定向缺少Location(HTTP $code)"; return null }
+                    current = URL(URL(current), loc).toString()
+                    continue
+                }
+                if (code !in 200..299) { lastStatus = "HTTP $code"; return null }
+                val input = conn.inputStream ?: run { lastStatus = "响应体为空"; return null }
+                val out = java.io.ByteArrayOutputStream()
+                val buf = ByteArray(4096)
+                var total = 0
+                while (true) {
+                    val n = input.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > 131072) { lastStatus = "响应过大(>$total)"; return null }
+                    out.write(buf, 0, n)
+                }
+                val body = String(out.toByteArray(), Charsets.UTF_8)
+                lastStatus = "HTTP $code 成功(${body.length}字节)"
+                return body
+            } catch (e: Exception) {
+                lastStatus = "异常: ${e.javaClass.simpleName}: ${e.message}"
+                android.util.Log.w(TAG, "httpGet fail url=$current : $lastStatus")
+                return null
+            } finally {
+                try { conn?.disconnect() } catch (_: Exception) {}
             }
-            if (conn.responseCode != 200) return null
-            val ct = conn.contentType ?: ""
-            if (accept == "text/markdown" && !ct.startsWith("text/markdown")) {
-                // 部分服务器不严格返回 content-type，仍尝试解析
-            }
-            val input = conn.inputStream ?: return null
-            val out = java.io.ByteArrayOutputStream()
-            val buf = ByteArray(4096)
-            var total = 0
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                total += n
-                if (total > 131072) return null
-                out.write(buf, 0, n)
-            }
-            return String(out.toByteArray(), Charsets.UTF_8)
-        } catch (e: Exception) {
-            return null
-        } finally {
-            conn?.disconnect()
         }
+        lastStatus = "重定向过多"
+        return null
     }
 }

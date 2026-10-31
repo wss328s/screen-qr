@@ -20,12 +20,19 @@ object ScanHistory {
     // 正在联网解析的活码数量
     private var liveLoadingCount = 0
 
+    // 最近一次活码解析失败原因（诊断用，悬浮窗可见；成功或重置后清空）
+    @Volatile private var lastLiveError: String? = null
+
     fun reset() {
         items.clear()
         historySet.clear()
         recentNotify.clear()
         liveLoadingCount = 0
+        lastLiveError = null
     }
+
+    /** 设置/清空活码解析失败提示 */
+    fun setLiveError(msg: String?) { lastLiveError = msg }
 
     @Synchronized
     fun beginLive() { liveLoadingCount++ }
@@ -71,14 +78,15 @@ object ScanHistory {
     }
 
     fun statusText(): String {
-        if (items.isEmpty() && liveLoadingCount == 0) return "等待扫码..."
+        if (items.isEmpty() && liveLoadingCount == 0 && lastLiveError == null) return "等待扫码..."
         val sb = StringBuilder()
         items.forEachIndexed { i, content ->
             sb.append("第${i+1}个: $content\n")
         }
         if (liveLoadingCount > 0) {
-            sb.append("正在获取网络内容…")
+            sb.append("正在获取网络内容…\n")
         }
+        lastLiveError?.let { sb.append("⚠ $it") }
         return sb.toString().trimEnd()
     }
 

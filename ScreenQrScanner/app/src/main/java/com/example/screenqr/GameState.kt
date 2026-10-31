@@ -30,6 +30,9 @@ object GameState {
     // 正在联网解析的活码数量（loading 提示）
     var liveLoadingCount = 0
         private set
+    // 最近一次活码解析失败原因（诊断用，悬浮窗可见；成功或重置后清空）
+    @Volatile var lastLiveError: String? = null
+        private set
 
     fun reset() {
         legs.forEach { it.codes.clear() }
@@ -37,7 +40,10 @@ object GameState {
         totalRead = 0
         seenCodes.clear()
         liveLoadingCount = 0
+        lastLiveError = null
     }
+
+    fun setLiveError(msg: String?) { lastLiveError = msg }
 
     fun beginLive() { liveLoadingCount++ }
     fun endLive() { if (liveLoadingCount > 0) liveLoadingCount-- }
@@ -81,6 +87,7 @@ object GameState {
         if (liveLoadingCount > 0) {
             sb.append("\n正在获取网络内容…")
         }
+        lastLiveError?.let { sb.append("\n⚠ $it") }
         return sb.toString()
     }
 
