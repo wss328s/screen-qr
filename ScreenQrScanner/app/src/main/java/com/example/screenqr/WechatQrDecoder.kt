@@ -37,8 +37,12 @@ object WechatQrDecoder {
         if (loaded) return
         lastStatus = "加载中..."
         try {
-            Loader.load(org.bytedeco.opencv.opencv_java::class.java)
-            Log.i(TAG, "opencv_java loaded")
+            // 按需加载：只加载 wechat_qrcode 模块，JavaCPP 自动递归加载其依赖
+            // (wechat_qrcode -> dnn -> imgproc -> core + openblas)。
+            // 不用聚合类 opencv_java，否则会尝试加载所有 OpenCV 模块，
+            // 那些已被裁剪掉的模块会导致 UnsatisfiedLinkError。
+            Loader.load(org.bytedeco.opencv.opencv_wechat_qrcode::class.java)
+            Log.i(TAG, "opencv_wechat_qrcode loaded")
             lastStatus = "opencv已加载"
 
             val dir = File(ctx.filesDir, "wechat_qrcode").apply { mkdirs() }
