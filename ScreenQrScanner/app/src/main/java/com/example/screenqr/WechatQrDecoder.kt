@@ -41,7 +41,7 @@ object WechatQrDecoder {
             // (wechat_qrcode -> dnn -> imgproc -> core + openblas)。
             // 不用聚合类 opencv_java，否则会尝试加载所有 OpenCV 模块，
             // 那些已被裁剪掉的模块会导致 UnsatisfiedLinkError。
-            Loader.load(org.bytedeco.opencv.opencv_wechat_qrcode::class.java)
+            Loader.load(org.bytedeco.opencv.opencv_wechat_qrcode.WeChatQRCode::class.java)
             Log.i(TAG, "opencv_wechat_qrcode loaded")
             lastStatus = "opencv已加载"
 
