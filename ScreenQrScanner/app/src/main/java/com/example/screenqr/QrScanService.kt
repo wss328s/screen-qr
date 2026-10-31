@@ -359,7 +359,7 @@ class QrScanService : Service() {
                         // 解析失败：短链域名含数字（qr61→61），兜底会误记，直接丢弃不记录
                         val content = live?.content?.trim()
                         if (content.isNullOrBlank()) {
-                            GameState.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}")
+                            GameState.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}\n${LiveCodeResolver.lastDetail}")
                             mainHandler.post { FloatingResultManager.update(this) }
                             return@execute
                         }
@@ -405,7 +405,7 @@ class QrScanService : Service() {
                         // 成功显示真实内容；失败时在悬浮窗显示失败原因（不把 URL 当结果记录）
                         val content = live?.content
                         if (content.isNullOrBlank()) {
-                            ScanHistory.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}")
+                            ScanHistory.setLiveError("活码解析失败: ${LiveCodeResolver.lastStatus}\n${LiveCodeResolver.lastDetail}")
                             mainHandler.post { FloatingResultManager.update(this) }
                             return@execute
                         }

@@ -40,8 +40,12 @@ object LiveCodeResolver {
         private set
 
     private val webLinkRegex = Regex("^https?://", RegexOption.IGNORE_CASE)
-    private val caoliaoHostRegex = Regex("qr[0-9]+\\.cn", RegexOption.IGNORE_CASE)
-    private val caoliaoPathRegex = Regex("/[A-Za-z0-9]+/[A-Za-z0-9]+/?")
+    // 草料域名：qrNN.cn（含任意子域名），如 qr61.cn / www.qr61.cn
+    private val caoliaoHostRegex = Regex("([A-Za-z0-9-]+\\.)*qr[0-9]+\\.cn", RegexOption.IGNORE_CASE)
+    // 草料路径：1~3 段字母数字（不同活码格式段数不同）
+    private val caoliaoPathRegex = Regex("/[A-Za-z0-9]+(/[A-Za-z0-9]+){0,2}/?")
+    // 宽松域名判断：只看 host 是否草料（不校验路径/端口），用于 markdown 端点兜底
+    private val caoliaoHostLooseRegex = Regex("^([A-Za-z0-9-]+\\.)*qr[0-9]+\\.cn$", RegexOption.IGNORE_CASE)
     // 从文本中提取 URL：某些引擎可能给 URL 加 HRI 前缀（如 "]Q1https://..."），
     // 需要截取从 http(s):// 开始的完整 URL 部分。
     private val urlExtractRegex = Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE)
@@ -75,6 +79,17 @@ object LiveCodeResolver {
         }
     }
 
+    /** 宽松判断：host 是否为草料域名（qrNN.cn，含子域名），不校验路径 */
+    fun isCaoliaoHost(text: String): Boolean {
+        return try {
+            val uri = URI(extractUrl(text))
+            val host = uri.host ?: return false
+            caoliaoHostLooseRegex.matches(host)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     /**
      * 解析活码，返回真实内容（后台线程调用）。
      * @param fresh 为 true 时强制走网络（不使用短期缓存）
@@ -89,7 +104,14 @@ object LiveCodeResolver {
             cache[url]?.let { if (now - it.time < CACHE_TTL_MS) return it.result }
         }
         val caoliao = isCaoliao(url)
-        val content = if (caoliao) fetchCaoliao(url) else fetchGeneric(url)
+        var content = if (caoliao) fetchCaoliao(url) else fetchGeneric(url)
+        // 兜底：通用网页抓取失败（活码落地页常是 JS 渲染，提取不到内容）时，
+        // 无条件尝试草料 markdown 端点（?format=md）。对草料域名有效；非草料域名
+        // 会返回 404/非 markdown，parse 失败返回 null，无害。
+        if (content.isNullOrBlank() && !caoliao) {
+            android.util.Log.i(TAG, "generic failed, trying markdown endpoint: $url")
+            content = fetchCaoliao(url)
+        }
         if (content.isNullOrBlank()) {
             android.util.Log.w(TAG, "resolve fail url=$url caoliao=$caoliao status=$lastStatus detail=$lastDetail")
             return null
