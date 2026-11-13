@@ -9,6 +9,7 @@ import android.provider.Settings
 import android.util.DisplayMetrics
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -31,6 +32,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var soundSwitch: MaterialSwitch
     private lateinit var bootSwitch: MaterialSwitch
     private lateinit var bootValue: TextView
+    private lateinit var hideIconSwitch: MaterialSwitch
+    private lateinit var hideIconValue: TextView
+    private lateinit var restartHint: TextView
     private lateinit var liveCodeSwitch: MaterialSwitch
     private lateinit var liveCodeValue: TextView
     private lateinit var soundValue: TextView
@@ -63,6 +67,9 @@ class SettingsActivity : AppCompatActivity() {
         soundValue = findViewById(R.id.soundValue)
         bootSwitch = findViewById(R.id.bootSwitch)
         bootValue = findViewById(R.id.bootValue)
+        hideIconSwitch = findViewById(R.id.hideIconSwitch)
+        hideIconValue = findViewById(R.id.hideIconValue)
+        restartHint = findViewById(R.id.restartHint)
         liveCodeSwitch = findViewById(R.id.liveCodeSwitch)
         liveCodeValue = findViewById(R.id.liveCodeValue)
         deviceInfo = findViewById(R.id.deviceInfo)
@@ -116,6 +123,32 @@ class SettingsActivity : AppCompatActivity() {
         bootSwitch.setOnCheckedChangeListener { _, checked ->
             SettingsManager.setBoot(this, checked)
             bootValue.text = if (checked) "已开启" else "已关闭"
+        }
+
+        hideIconSwitch.setOnCheckedChangeListener { _, checked ->
+            // 没有悬浮窗权限时隐藏图标等于把自己锁在外面：直接拒绝
+            if (checked && !Settings.canDrawOverlays(this)) {
+                hideIconSwitch.isChecked = false
+                Toast.makeText(this, "请先授予悬浮窗权限，否则隐藏图标后进不来", Toast.LENGTH_LONG).show()
+                return@setOnCheckedChangeListener
+            }
+            SettingsManager.setHideIcon(this, checked)
+            hideIconValue.text = if (checked) "已隐藏" else "已显示"
+            if (checked) {
+                Toast.makeText(this, "桌面图标已隐藏，下拉通知栏点「设置」可再进来", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        // 重新开始识别：走和开机自启一样的无界面中转页（只弹系统录屏授权框）
+        findViewById<MaterialCardView>(R.id.restartCard).setOnClickListener {
+            if (QrScanService.isRunning) {
+                Toast.makeText(this, "正在识别中，无需重新授权", Toast.LENGTH_SHORT).show()
+            } else if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "请先授予悬浮窗权限", Toast.LENGTH_LONG).show()
+            } else {
+                startActivity(Intent(this, BootStartActivity::class.java))
+                finish()
+            }
         }
 
         liveCodeSwitch.setOnCheckedChangeListener { _, checked ->
@@ -192,6 +225,18 @@ class SettingsActivity : AppCompatActivity() {
         val bootOn = SettingsManager.getBoot(this)
         bootSwitch.isChecked = bootOn
         bootValue.text = if (bootOn) "已开启" else "已关闭"
+
+        // 桌面图标
+        val hidden = SettingsManager.getHideIcon(this)
+        hideIconSwitch.isChecked = hidden
+        hideIconValue.text = if (hidden) "已隐藏" else "已显示"
+
+        // 运行状态
+        restartHint.text = if (QrScanService.isRunning) {
+            "识别正在运行；重新授权前请先在悬浮窗/主界面停止"
+        } else {
+            "扫描停止后点这里，重新弹出录屏授权"
+        }
 
         // 活码解析
         val liveOn = SettingsManager.getLiveCode(this)

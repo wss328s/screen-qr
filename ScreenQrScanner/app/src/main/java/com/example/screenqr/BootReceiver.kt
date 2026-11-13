@@ -10,7 +10,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 /**
- * 开机自启：收到开机广播后直接打开APP，自动弹截屏授权窗。
+ * 开机自启：收到开机广播后拉起「无界面中转页」，直接弹出系统录屏授权框，
+ * 用户点一次即进入悬浮窗识别，不出现 App 主界面。
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -19,9 +20,12 @@ class BootReceiver : BroadcastReceiver() {
         // 未开启开机自启则不处理
         if (!SettingsManager.getBoot(context)) return
 
-        // 直接尝试打开MainActivity（打开后会自动请求权限）
-        val openIntent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // 已经在识别中就不用再拉授权了
+        if (QrScanService.isRunning) return
+
+        // 直接拉起中转页（它只负责弹系统授权框，自己没有任何界面）
+        val openIntent = Intent(context, BootStartActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
 
         // 尝试直接启动（Android 10+ 后台启动Activity可能被限制，被限制了就发通知兜底）

@@ -26,12 +26,33 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="false" />
+
+        <!--
+            桌面图标挂在 activity-alias 上：
+            用户在设置里打开「隐藏桌面图标」后，只禁用这个 alias，
+            MainActivity 本身仍然可以被通知栏/开机中转页正常拉起。
+            默认启用，保证首次安装能看到图标去授权。
+        -->
+        <activity-alias
+            android:name=".LauncherAlias"
+            android:targetActivity=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <!-- 开机自启中转页：无界面，只负责弹系统录屏授权框 -->
+        <activity
+            android:name=".BootStartActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <activity
             android:name=".SettingsActivity"

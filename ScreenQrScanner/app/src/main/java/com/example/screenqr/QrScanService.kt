@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.graphics.drawable.Icon
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.ImageReader
@@ -112,6 +113,8 @@ class QrScanService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        // 覆盖安装后 activity-alias 会恢复成"显示"，这里按用户设置把图标状态纠正回来
+        SettingsManager.applyHideIcon(this, SettingsManager.getHideIcon(this))
         // Android 14+ 需要指定服务类型；低于 14 用兼容方式进入前台
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"),
@@ -526,13 +529,32 @@ class QrScanService : Service() {
         return variance < 25.0
     }
 
+    /** 通知栏里「设置」的跳转（桌面图标可以隐藏，这里是唯一入口） */
+    private fun settingsPendingIntent(requestCode: Int): PendingIntent {
+        val intent = Intent(this, SettingsActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        return PendingIntent.getActivity(
+            this, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     private fun buildNotification(title: String, text: String): Notification {
-        return Notification.Builder(this, CHANNEL_ID)
+        val builder = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
-            .build()
+            .setContentIntent(settingsPendingIntent(101))
+            .addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(this, R.mipmap.ic_launcher),
+                    "设置",
+                    settingsPendingIntent(102)
+                ).build()
+            )
+        return builder.build()
     }
 
     private fun updateStatusNotification(title: String? = null, text: String? = null) {

@@ -1,6 +1,8 @@
 package com.example.screenqr
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 
 /**
  * 设置管理器：用SharedPreferences保存所有参数。
@@ -71,6 +73,10 @@ object SettingsManager {
     const val KEY_BOOT = "boot_auto_start"
     const val DEFAULT_BOOT = true
 
+    // 桌面图标隐藏开关（隐藏后从常驻通知的「设置」按钮进入）
+    const val KEY_HIDE_ICON = "hide_launcher_icon"
+    const val DEFAULT_HIDE_ICON = false
+
     // 震动开关
     const val KEY_VIBRATE = "vibrate"
     const val DEFAULT_VIBRATE = true
@@ -132,6 +138,32 @@ object SettingsManager {
 
     fun getBoot(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_BOOT, DEFAULT_BOOT)
     fun setBoot(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_BOOT, v).apply()
+
+    fun getHideIcon(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_HIDE_ICON, DEFAULT_HIDE_ICON)
+
+    /** 设置是否隐藏桌面图标，并立即生效 */
+    fun setHideIcon(ctx: Context, v: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_HIDE_ICON, v).apply()
+        applyHideIcon(ctx, v)
+    }
+
+    /**
+     * 应用桌面图标显隐。
+     * 桌面入口挂在 <activity-alias android:name=".LauncherAlias"> 上，
+     * 因此只需要开关这个 alias，不用动 MainActivity 本身。
+     */
+    fun applyHideIcon(ctx: Context, hide: Boolean) {
+        val alias = ComponentName(ctx.packageName, "${ctx.packageName}.LauncherAlias")
+        val state = if (hide) PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+        else PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        try {
+            ctx.packageManager.setComponentEnabledSetting(
+                alias, state, PackageManager.DONT_KILL_APP
+            )
+        } catch (e: Exception) {
+            // 个别 ROM 会拒绝修改组件状态，忽略即可（图标继续显示）
+        }
+    }
 
     fun getVibrate(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_VIBRATE, DEFAULT_VIBRATE)
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()
