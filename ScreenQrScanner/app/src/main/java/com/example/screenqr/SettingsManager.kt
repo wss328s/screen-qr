@@ -13,7 +13,8 @@ object SettingsManager {
     const val KEY_MODE = "mode"
     const val MODE_SCAN = 0    // 纯扫码
     const val MODE_GAME = 1    // 比赛导航
-    const val DEFAULT_MODE = MODE_SCAN
+    // 默认工作模式：比赛导航
+    const val DEFAULT_MODE = MODE_GAME
 
     // 识别频率（帧/秒）
     const val KEY_FPS = "fps"
@@ -26,7 +27,8 @@ object SettingsManager {
     const val FPS_20 = 20 // 50ms
     const val FPS_25 = 25 // 40ms
     const val FPS_30 = 30 // 33ms
-    const val DEFAULT_FPS = FPS_5
+    // 默认识别频率：20 帧/秒
+    const val DEFAULT_FPS = FPS_20
 
     // 去重窗口（秒）
     const val KEY_DEDUP = "dedup"
@@ -81,9 +83,9 @@ object SettingsManager {
     const val KEY_LIVE = "live_code"
     const val DEFAULT_LIVE = true
 
-    // 悬浮窗透明度（0-100）
+    // 悬浮窗透明度（0-100）；默认 15%
     const val KEY_FLOAT_ALPHA = "float_alpha"
-    const val DEFAULT_FLOAT_ALPHA = 100
+    const val DEFAULT_FLOAT_ALPHA = 15
 
     // 悬浮窗样式
     const val KEY_FLOAT_STYLE = "float_style"

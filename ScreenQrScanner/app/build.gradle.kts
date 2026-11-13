@@ -22,9 +22,8 @@ android {
     packaging {
         jniLibs {
             // 裁剪 OpenCV 无用模块：只保留微信引擎依赖链
-            // wechat_qrcode -> dnn -> imgproc -> core + openblas(nolapack) + zxingcpp
+            // wechat_qrcode -> dnn -> imgproc -> core(含 cudev=libjnicvkernels) + openblas(nolapack) + zxingcpp
             excludes += setOf(
-                "lib/arm64-v8a/libjnicvkernels.so",
                 "lib/arm64-v8a/libjniopenblas.so",
                 "lib/arm64-v8a/libjniopencv_aruco.so",
                 "lib/arm64-v8a/libjniopencv_bgsegm.so",
