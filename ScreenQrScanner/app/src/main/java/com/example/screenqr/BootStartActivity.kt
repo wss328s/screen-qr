@@ -59,7 +59,7 @@ class BootStartActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_SCREEN_CAPTURE && resultCode == RESULT_OK && data != null) {
+        if (requestCode == REQ_SCREEN_CAPTURE && resultCode == Activity.RESULT_OK && data != null) {
             val svc = Intent(this, QrScanService::class.java).apply {
                 action = QrScanService.ACTION_START
                 putExtra(QrScanService.EXTRA_RESULT_CODE, resultCode)
