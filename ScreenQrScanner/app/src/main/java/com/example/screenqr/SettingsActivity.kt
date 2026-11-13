@@ -121,6 +121,12 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         bootSwitch.setOnCheckedChangeListener { _, checked ->
+            // 图标已隐藏时不允许关闭开机自启，否则重启后再也进不来
+            if (!checked && SettingsManager.getHideIcon(this)) {
+                bootSwitch.isChecked = true
+                Toast.makeText(this, "桌面图标已隐藏，不能关闭开机自启", Toast.LENGTH_LONG).show()
+                return@setOnCheckedChangeListener
+            }
             SettingsManager.setBoot(this, checked)
             bootValue.text = if (checked) "已开启" else "已关闭"
         }
@@ -135,7 +141,11 @@ class SettingsActivity : AppCompatActivity() {
             SettingsManager.setHideIcon(this, checked)
             hideIconValue.text = if (checked) "已隐藏" else "已显示"
             if (checked) {
-                Toast.makeText(this, "桌面图标已隐藏，下拉通知栏点「设置」可再进来", Toast.LENGTH_LONG).show()
+                // 隐藏图标后唯一入口是通知栏和开机自启，强制打开开机自启防止把自己锁死
+                SettingsManager.setBoot(this, true)
+                bootSwitch.isChecked = true
+                bootValue.text = "已开启"
+                Toast.makeText(this, "桌面图标已隐藏，已自动开启开机自启；下拉通知栏点「设置」可再进来", Toast.LENGTH_LONG).show()
             }
         }
 
