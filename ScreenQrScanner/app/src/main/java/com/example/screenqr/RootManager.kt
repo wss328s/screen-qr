@@ -40,14 +40,23 @@ object RootManager {
     private fun runAsRoot(cmds: List<String>): String? {
         var p: Process? = null
         return try {
-            p = ProcessBuilder("su").redirectErrorStream(true).start()
-            val os = p.outputStream
+            val proc = ProcessBuilder("su").redirectErrorStream(true).start()
+            p = proc
+            val os = proc.outputStream
             os.write("id\n".toByteArray())
             for (c in cmds) os.write((c + "\n").toByteArray())
             os.write("exit\n".toByteArray())
             os.flush()
-            val out = p.inputStream.bufferedReader().readText()
-            p.waitFor()
+            // 兜底：Magisk 有待确认授权时 su 会一直等，5 秒后强制收尾，避免开机流程卡死
+            Thread {
+                try {
+                    Thread.sleep(5000)
+                    proc.destroy()
+                } catch (_: Exception) {
+                }
+            }.start()
+            val out = proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
             out
         } catch (e: Exception) {
             lastStatus = "su 不可用: ${e.javaClass.simpleName}: ${e.message}"
@@ -103,8 +112,9 @@ object RootManager {
         }
         val hasRoot = out.contains("uid=0")
         available = hasRoot
+        val lower = out.lowercase()
         lastStatus = if (hasRoot) {
-            if (out.contains("PROJECT_MEDIA: allow")) {
+            if (lower.contains("project_media") && lower.contains("allow")) {
                 "已 root：录屏/悬浮窗已永久放行，开机不再弹框"
             } else {
                 "已 root：已执行授权命令（个别机型可能仍需一次确认）"
