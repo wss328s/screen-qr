@@ -103,6 +103,8 @@ object RootManager {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             cmds += "pm grant $pkg android.permission.POST_NOTIFICATIONS"
         }
+        // 加入电池优化白名单，避免后台截屏服务被系统冻结（国产 ROM 效果不一，失败也无害）
+        cmds += "dumpsys deviceidle whitelist +$pkg"
         cmds += "cmd appops get $pkg PROJECT_MEDIA"
 
         val out = runAsRoot(cmds)
