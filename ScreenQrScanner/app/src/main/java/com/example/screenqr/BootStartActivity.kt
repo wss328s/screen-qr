@@ -37,6 +37,22 @@ class BootStartActivity : Activity() {
             return
         }
 
+        // 有 root 时先把录屏/悬浮窗的 appop 写进系统：
+        // SystemUI 的 MediaProjectionPermissionActivity 一旦发现本包已持有
+        // PROJECT_MEDIA，就直接 setResult(RESULT_OK) 并结束，不会弹任何框。
+        if (SettingsManager.getRootGrant(this)) {
+            Thread {
+                RootManager.grantAll(applicationContext)
+                runOnUiThread { requestCapture() }
+            }.start()
+        } else {
+            requestCapture()
+        }
+    }
+
+    private fun requestCapture() {
+        if (isFinishing || isDestroyed) return
+
         // 悬浮窗权限是运行前提，同时也是 Android 10+ 允许后台启动 Activity 的豁免项。
         // 没有这个权限，开机后弹不出授权框，安静退出（用户可下拉通知栏进设置补授权）。
         if (!Settings.canDrawOverlays(this)) {

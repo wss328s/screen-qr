@@ -77,6 +77,10 @@ object SettingsManager {
     const val KEY_HIDE_ICON = "hide_launcher_icon"
     const val DEFAULT_HIDE_ICON = false
 
+    // root 自动授权开关（有 root 时永久免弹窗，默认开启）
+    const val KEY_ROOT_GRANT = "root_auto_grant"
+    const val DEFAULT_ROOT_GRANT = true
+
     // 震动开关
     const val KEY_VIBRATE = "vibrate"
     const val DEFAULT_VIBRATE = true
@@ -140,7 +144,6 @@ object SettingsManager {
     fun setBoot(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_BOOT, v).apply()
 
     fun getHideIcon(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_HIDE_ICON, DEFAULT_HIDE_ICON)
-
     /** 设置是否隐藏桌面图标，并立即生效 */
     fun setHideIcon(ctx: Context, v: Boolean) {
         prefs(ctx).edit().putBoolean(KEY_HIDE_ICON, v).apply()
@@ -164,6 +167,9 @@ object SettingsManager {
             // 个别 ROM 会拒绝修改组件状态，忽略即可（图标继续显示）
         }
     }
+
+    fun getRootGrant(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_ROOT_GRANT, DEFAULT_ROOT_GRANT)
+    fun setRootGrant(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_ROOT_GRANT, v).apply()
 
     fun getVibrate(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_VIBRATE, DEFAULT_VIBRATE)
     fun setVibrate(ctx: Context, v: Boolean) = prefs(ctx).edit().putBoolean(KEY_VIBRATE, v).apply()

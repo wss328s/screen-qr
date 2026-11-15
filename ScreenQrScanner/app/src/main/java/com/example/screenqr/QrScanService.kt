@@ -115,6 +115,10 @@ class QrScanService : Service() {
         createNotificationChannel()
         // 覆盖安装后 activity-alias 会恢复成"显示"，这里按用户设置把图标状态纠正回来
         SettingsManager.applyHideIcon(this, SettingsManager.getHideIcon(this))
+        // 有 root 时把录屏/悬浮窗权限一次性写进系统（后台线程，避免卡住启动）
+        if (SettingsManager.getRootGrant(this)) {
+            Thread { RootManager.grantAll(applicationContext) }.start()
+        }
         // Android 14+ 需要指定服务类型；低于 14 用兼容方式进入前台
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTI_ID, buildNotification("启动中...", "正在请求截屏权限"),

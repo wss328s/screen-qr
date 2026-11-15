@@ -71,6 +71,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ensurePermissionsAndStart() {
+        // 有 root：先把录屏/悬浮窗 appop 写进系统，系统就会静默放行（不弹任何框）
+        if (SettingsManager.getRootGrant(this) && !Settings.canDrawOverlays(this)) {
+            Thread {
+                RootManager.grantAll(applicationContext)
+                runOnUiThread { doEnsurePermissionsAndStart() }
+            }.start()
+            return
+        }
+        doEnsurePermissionsAndStart()
+    }
+
+    private fun doEnsurePermissionsAndStart() {
         // 悬浮窗权限
         if (!Settings.canDrawOverlays(this)) {
             Toast.makeText(this, "请先授予\"显示在其他应用上层\"权限", Toast.LENGTH_LONG).show()
@@ -80,7 +92,7 @@ class MainActivity : AppCompatActivity() {
             )
             return
         }
-        // 屏幕录制授权
+        // 屏幕录制授权（root 已放行时系统会直接返回 RESULT_OK，不弹框）
         startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), REQ_SCREEN_CAPTURE)
     }
 

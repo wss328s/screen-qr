@@ -34,6 +34,8 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var bootValue: TextView
     private lateinit var hideIconSwitch: MaterialSwitch
     private lateinit var hideIconValue: TextView
+    private lateinit var rootSwitch: MaterialSwitch
+    private lateinit var rootValue: TextView
     private lateinit var restartHint: TextView
     private lateinit var liveCodeSwitch: MaterialSwitch
     private lateinit var liveCodeValue: TextView
@@ -69,6 +71,8 @@ class SettingsActivity : AppCompatActivity() {
         bootValue = findViewById(R.id.bootValue)
         hideIconSwitch = findViewById(R.id.hideIconSwitch)
         hideIconValue = findViewById(R.id.hideIconValue)
+        rootSwitch = findViewById(R.id.rootSwitch)
+        rootValue = findViewById(R.id.rootValue)
         restartHint = findViewById(R.id.restartHint)
         liveCodeSwitch = findViewById(R.id.liveCodeSwitch)
         liveCodeValue = findViewById(R.id.liveCodeValue)
@@ -146,6 +150,20 @@ class SettingsActivity : AppCompatActivity() {
                 bootSwitch.isChecked = true
                 bootValue.text = "已开启"
                 Toast.makeText(this, "桌面图标已隐藏，已自动开启开机自启；下拉通知栏点「设置」可再进来", Toast.LENGTH_LONG).show()
+            }
+        }
+
+        // root 自动授权：有 root 时一次性把录屏/悬浮窗权限写进系统，之后开机不再弹框
+        rootSwitch.setOnCheckedChangeListener { _, checked ->
+            if (checked == SettingsManager.getRootGrant(this)) return@setOnCheckedChangeListener
+            SettingsManager.setRootGrant(this, checked)
+            if (checked) grantRootAsync() else refreshTexts()
+        }
+        findViewById<MaterialCardView>(R.id.rootCard).setOnClickListener {
+            if (!SettingsManager.getRootGrant(this)) {
+                Toast.makeText(this, "请先打开右侧开关", Toast.LENGTH_SHORT).show()
+            } else {
+                grantRootAsync()
             }
         }
 
@@ -241,6 +259,10 @@ class SettingsActivity : AppCompatActivity() {
         hideIconSwitch.isChecked = hidden
         hideIconValue.text = if (hidden) "已隐藏" else "已显示"
 
+        // root 自动授权
+        rootSwitch.isChecked = SettingsManager.getRootGrant(this)
+        refreshRootStatus()
+
         // 运行状态
         restartHint.text = if (QrScanService.isRunning) {
             "识别正在运行；重新授权前请先在悬浮窗/主界面停止"
@@ -285,6 +307,33 @@ class SettingsActivity : AppCompatActivity() {
 
         // 识别引擎状态
         refreshEngineStatus()
+    }
+
+    /** 显示 root 授权状态；首次进入且开关为开时自动跑一次 */
+    private fun refreshRootStatus() {
+        if (!SettingsManager.getRootGrant(this)) {
+            rootValue.text = "已关闭，按系统弹窗授权"
+            return
+        }
+        if (RootManager.lastStatus != "未检测") {
+            rootValue.text = RootManager.lastStatus
+        } else {
+            rootValue.text = "正在执行一次授权…"
+            grantRootAsync()
+        }
+    }
+
+    /** 后台线程执行 su 授权，避免卡住界面 */
+    private fun grantRootAsync() {
+        rootValue.text = "正在执行 su 授权…"
+        Thread {
+            val status = RootManager.grantAll(applicationContext, force = true)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                rootValue.text = status
+                overlayPermValue.text = if (Settings.canDrawOverlays(this)) "已授予" else "未授予"
+            }
+        }.start()
     }
 
     /** 显示识别引擎状态（微信版用于排查引擎是否正常加载） */
